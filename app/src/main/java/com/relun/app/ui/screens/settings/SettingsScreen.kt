@@ -104,6 +104,12 @@ fun SettingsScreen() {
                 ToggleRow("Show my distance", settings.showDistance, onToggle = {
                     patch(SettingsPatch(showDistance = !settings.showDistance), settings.copy(showDistance = !settings.showDistance))
                 })
+                ToggleRow("Message requests", settings.allowMessageRequests, subtitle = "Let people you haven’t matched with pay to message you", onToggle = {
+                    patch(
+                        SettingsPatch(allowMessageRequests = !settings.allowMessageRequests),
+                        settings.copy(allowMessageRequests = !settings.allowMessageRequests),
+                    )
+                })
                 ListRow("Blocked users", actions.openBlocked, value = blockedCount?.let { "$it blocked" }, divider = false)
             }
             Section("Preferences") {
@@ -113,6 +119,7 @@ fun SettingsScreen() {
                 ListRow("Location services", { openAppSettings(context) }, value = if (c.location.hasPermission()) "On" else "Off", divider = false)
             }
             Section("Account") {
+                ListRow("Relun Plus", actions.openPlus, value = if (wallet.plus != null) "Active" else "Get Plus")
                 ListRow("Coins & purchases", actions.openCoins, value = formatCoins(wallet.balance))
                 ListRow("Help", { c.messenger.info("Coming soon") })
                 ListRow("Terms of Service", { c.messenger.info("Coming soon") })

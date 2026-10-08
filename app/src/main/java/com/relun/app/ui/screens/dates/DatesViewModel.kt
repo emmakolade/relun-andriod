@@ -36,6 +36,8 @@ class DatesViewModel(private val c: AppContainer) : ViewModel() {
     private val _state = MutableStateFlow(DatesState())
     val state: StateFlow<DatesState> = _state.asStateFlow()
 
+    val wallet = c.coins.wallet
+
     init {
         loadBrowse()
         loadMine()
@@ -119,9 +121,11 @@ class DatesViewModel(private val c: AppContainer) : ViewModel() {
         _state.update { it.copy(posting = true) }
         viewModelScope.launch {
             c.dates.create(activity, place, at, description)
-                .onSuccess { created ->
+                .onSuccess { (created, charged) ->
                     _state.update { it.copy(posting = false, creating = false, view = DatesView.Mine, mine = listOf(created) + it.mine) }
-                    c.messenger.success("Your date is live")
+                    // A free slot was used, or coins spent; the server has the counts.
+                    launch { c.coins.refresh() }
+                    c.messenger.success(if (charged > 0) "Your date is live · −$charged coins" else "Your date is live")
                 }
                 .onFailure { e ->
                     _state.update { it.copy(posting = false) }
@@ -147,7 +151,11 @@ class DatesViewModel(private val c: AppContainer) : ViewModel() {
         _state.update { s -> s.copy(mine = s.mine.filterNot { it.id == post.id }) }
         viewModelScope.launch {
             c.dates.delete(post.id)
-                .onSuccess { c.messenger.info("Date removed") }
+                .onSuccess {
+                    // Frees one of the free active slots.
+                    launch { c.coins.refresh() }
+                    c.messenger.info("Date removed")
+                }
                 .onFailure { e ->
                     _state.update { it.copy(mine = before) }
                     c.messenger.error(e.message ?: "Couldn’t delete the date.")

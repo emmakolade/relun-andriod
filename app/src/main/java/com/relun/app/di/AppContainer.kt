@@ -76,7 +76,12 @@ class AppContainer(app: Application) {
                 if (!signedIn) return@collect
                 if (foreground) socket.connect()
                 push.register()
-                launch { coins.refresh().onSuccess { w -> billing.loadProducts(w.packages.map { it.productId }) } }
+                launch {
+                    coins.refresh().onSuccess { w ->
+                        billing.loadProducts(w.packages.map { it.productId })
+                        billing.loadPlus(w.plans.firstOrNull()?.playProductId ?: BillingManager.PLUS_PRODUCT_ID)
+                    }
+                }
                 launch { profile.refresh() }
                 launch { settings.refresh() }
                 launch { billing.reconcile() }

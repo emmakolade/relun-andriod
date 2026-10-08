@@ -84,6 +84,12 @@ interface ApiService {
         @Query("limit") limit: Int = 50,
     ): MessagesResponse
 
+    @POST("api/chat/{userId}/request")
+    suspend fun sendMessageRequest(@Path("userId") userId: String, @Body body: SendRequestBody): SendRequestResponse
+
+    @POST("api/chat/{userId}/request/decline")
+    suspend fun declineMessageRequest(@Path("userId") userId: String): ResponseBody
+
     // ---------- Coins ----------
     @GET("api/coins")
     suspend fun wallet(): WalletResponse
@@ -91,14 +97,12 @@ interface ApiService {
     @POST("api/coins/purchases")
     suspend fun confirmPurchase(@Body body: PurchaseBody): PurchaseResponse
 
-    @POST("api/coins/unlock-chat/{userId}")
-    suspend fun unlockChat(@Path("userId") userId: String): UnlockChatResponse
 
     @POST("api/coins/bonus/{id}/seen")
     suspend fun markBonusSeen(@Path("id") id: String): ResponseBody
 
     @POST("api/coins/insights")
-    suspend fun buyInsights(): InsightsResponse
+    suspend fun buyInsights(@Body body: InsightsBody): InsightsResponse
 
     // ---------- Dates ----------
     @GET("api/dates")
@@ -135,6 +139,14 @@ interface ApiService {
 
     @POST("api/safety/reports/{userId}")
     suspend fun report(@Path("userId") userId: String, @Body body: ReportBody): ResponseBody
+
+    // ---------- Relun Plus ----------
+    @GET("api/plus")
+    suspend fun plus(): EntitlementsResponse
+
+    /** After Google Play reports the subscription, before acknowledging it. */
+    @POST("api/plus/play")
+    suspend fun confirmPlayPlus(@Body body: PlayPlusBody): EntitlementsResponse
 
     // ---------- Settings & push ----------
     @GET("api/settings")

@@ -1,5 +1,7 @@
 package com.relun.app.ui.screens.dates
 
+import androidx.compose.ui.text.style.TextDecoration
+import com.relun.app.data.model.Wallet
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -174,7 +176,18 @@ fun DatesTab(showMine: Int) {
         }
     }
 
-    if (s.creating) CreateDateSheet(posting = s.posting, onPost = vm::post, onDismiss = { vm.openCreate(false) })
+    if (s.creating) {
+        val wallet by vm.wallet.collectAsStateWithLifecycle()
+        val actions = LocalAppActions.current
+        CreateDateSheet(
+            posting = s.posting,
+            wallet = wallet,
+            onPost = vm::post,
+            onDismiss = { vm.openCreate(false) },
+            onCoins = { vm.openCreate(false); actions.openCoins() },
+            onPlus = { vm.openCreate(false); actions.openPlus() },
+        )
+    }
     s.dialog?.let { ConfirmDialog(it, vm::dismissDialog) }
 }
 
@@ -272,7 +285,7 @@ private fun MineCard(post: DatePost, vm: DatesViewModel, modifier: Modifier) {
                     }
                     DateRequestStatus.Accepted -> Row(
                         Modifier.height(40.dp).clip(RoundedCornerShape(999.dp)).background(seg.tint).border(1.5.dp, seg.fill, RoundedCornerShape(999.dp))
-                            .clickable { actions.openChat(r.person.copy(isMatch = true, chatUnlocked = true)) }
+                            .clickable { actions.openChat(r.person.copy(isMatch = true)) }
                             .padding(horizontal = 14.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -289,8 +302,19 @@ private fun MineCard(post: DatePost, vm: DatesViewModel, modifier: Modifier) {
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-private fun CreateDateSheet(posting: Boolean, onPost: (String, String, Instant, String?) -> Unit, onDismiss: () -> Unit) {
+private fun CreateDateSheet(
+    posting: Boolean,
+    wallet: Wallet,
+    onPost: (String, String, Instant, String?) -> Unit,
+    onDismiss: () -> Unit,
+    onCoins: () -> Unit,
+    onPlus: () -> Unit,
+) {
     val seg = Relun.segment
+    // No free slot left: this post costs coins.
+    val paid = (wallet.dates.left ?: 1) <= 0
+    val cost = wallet.datePostCost
+    val short = paid && wallet.balance < cost
     var activity by remember { mutableStateOf("") }
     var place by remember { mutableStateOf("") }
     var date by remember { mutableStateOf<LocalDate?>(null) }
@@ -342,7 +366,33 @@ private fun CreateDateSheet(posting: Boolean, onPost: (String, String, Instant, 
             RelunTextField(desc, { desc = it.take(500) }, Modifier.fillMaxWidth(), placeholder = "Anything they should know?", singleLine = false, minLines = 2,
                 textStyle = MaterialTheme.typography.bodyMedium)
         }
-        PrimaryButton("Post Request", { at?.let { onPost(activity, place, it, desc) } }, enabled = valid, loading = posting)
+        if (paid) {
+            Column(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(RelunColors.WarningFill).padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                val live = if (wallet.dates.limit == 1) "a date" else "${wallet.dates.limit} dates"
+                Text(
+                    "You already have $live live. Posting another costs $cost coins. You have ${wallet.balance}.",
+                    style = MaterialTheme.typography.bodySmall.copy(lineHeight = 18.sp),
+                    color = RelunColors.WarningText,
+                )
+                if (short || wallet.plus == null) {
+                    Text(
+                        if (short) "Get coins" else "Post up to ${wallet.plusPerks.activeDates} at once with Relun Plus",
+                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold, textDecoration = TextDecoration.Underline),
+                        color = RelunColors.WarningText,
+                        modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable(onClick = if (short) onCoins else onPlus),
+                    )
+                }
+            }
+        }
+        PrimaryButton(
+            if (paid) "Post for $cost coins" else "Post Request",
+            { at?.let { onPost(activity, place, it, desc) } },
+            enabled = valid && !short,
+            loading = posting,
+        )
     }
 
     if (pickDate) {

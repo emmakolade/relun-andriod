@@ -1,5 +1,6 @@
 package com.relun.app.ui.screens.profile
 
+import com.relun.app.data.repository.isLikeLimit
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -92,6 +93,8 @@ import kotlinx.coroutines.launch
 data class PersonState(val person: Person? = null, val loading: Boolean = true, val error: String? = null)
 
 class PersonProfileViewModel(private val c: AppContainer, private val userId: String) : ViewModel() {
+
+    val wallet = c.coins.wallet
     private val _state = MutableStateFlow(PersonState())
     val state: StateFlow<PersonState> = _state.asStateFlow()
 
@@ -100,8 +103,10 @@ class PersonProfileViewModel(private val c: AppContainer, private val userId: St
         viewModelScope.launch {
             c.people.events.collect { e ->
                 when (e) {
-                    is PeopleEvent.ChatUnlocked -> if (e.userId == userId) update { it.copy(chatUnlocked = true) }
+                    is PeopleEvent.Matched -> if (e.userId == userId) update { it.copy(isMatch = true) }
                     is PeopleEvent.Liked -> if (e.userId == userId) update { it.copy(liked = true, isMatch = it.isMatch || e.isMatch) }
+                    is PeopleEvent.RequestSent -> if (e.userId == userId) load()
+                    is PeopleEvent.RequestDeclined -> if (e.userId == userId) load()
                     else -> Unit
                 }
             }
@@ -124,7 +129,8 @@ class PersonProfileViewModel(private val c: AppContainer, private val userId: St
         viewModelScope.launch {
             c.people.like(p).onFailure { e ->
                 update { it.copy(liked = false) }
-                c.messenger.error(e.message ?: "Couldn’t like ${p.firstName}.")
+                // Out of likes: the shell shows the Plus offer instead.
+                if (!e.isLikeLimit) c.messenger.error(e.message ?: "Couldn’t like ${p.firstName}.")
             }
         }
     }
@@ -291,7 +297,10 @@ private fun Content(person: Person, vm: PersonProfileViewModel) {
         ) {
             CircleIconButton(Icons.Rounded.Close, "Pass", { vm.pass(actions.back) }, size = 56.dp, iconSize = 26.dp, modifier = Modifier.shadow(4.dp, CircleShape))
             LikeButton(person.liked || person.isMatch, vm::like, Modifier.size(56.dp))
-            val enabled = person.isMatch
+            val wallet by vm.wallet.collectAsStateWithLifecycle()
+            val request = person.messageRequest
+            // Matches chat; anyone else can be messaged through a paid request unless they've turned those off.
+            val enabled = person.isMatch || request != null || person.acceptsMessageRequests
             Row(
                 Modifier
                     .weight(1f)
@@ -304,17 +313,26 @@ private fun Content(person: Person, vm: PersonProfileViewModel) {
             ) {
                 val fg = if (enabled) seg.onFill else RelunColors.DisabledText
                 when {
+                    !person.isMatch && request != null -> {
+                        Icon(Icons.Rounded.ChatBubble, null, tint = fg, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.size(8.dp))
+                        Text(if (request.outgoing) "View message" else "Reply", color = fg, style = MaterialTheme.typography.labelLarge.copy(fontSize = 16.sp))
+                    }
+                    !person.isMatch && person.acceptsMessageRequests -> {
+                        Icon(Icons.Rounded.ChatBubbleOutline, null, tint = fg, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.size(8.dp))
+                        if ((wallet.requests.left ?: 0) > 0) {
+                            Text("Message · Free", color = fg, style = MaterialTheme.typography.labelLarge.copy(fontSize = 16.sp))
+                        } else {
+                            Text("Message · ", color = fg, style = MaterialTheme.typography.labelLarge.copy(fontSize = 16.sp))
+                            CoinIcon(20.dp)
+                            Text(" ${wallet.messageRequestCost}", color = fg, style = MaterialTheme.typography.labelLarge.copy(fontSize = 16.sp))
+                        }
+                    }
                     !person.isMatch -> {
                         Icon(Icons.Rounded.Lock, null, tint = fg, modifier = Modifier.size(17.dp))
                         Spacer(Modifier.size(8.dp))
                         Text("Match to message", color = fg, style = MaterialTheme.typography.labelLarge.copy(fontSize = 16.sp))
-                    }
-                    !person.chatUnlocked -> {
-                        Icon(Icons.Rounded.ChatBubbleOutline, null, tint = fg, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.size(8.dp))
-                        Text("Message · ", color = fg, style = MaterialTheme.typography.labelLarge.copy(fontSize = 16.sp))
-                        CoinIcon(20.dp)
-                        Text(" 15", color = fg, style = MaterialTheme.typography.labelLarge.copy(fontSize = 16.sp))
                     }
                     else -> {
                         Icon(Icons.Rounded.ChatBubble, null, tint = fg, modifier = Modifier.size(18.dp))

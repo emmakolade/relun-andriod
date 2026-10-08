@@ -18,9 +18,10 @@ class DatesRepository(private val api: ApiService) {
     suspend fun browse() = apiCall { api.browseDates() }.map { res -> res.dates.map { it.toDomain() } }
     suspend fun mine() = apiCall { api.myDates() }.map { res -> res.dates.map { it.toDomain() } }
 
+    /** Posts a date: free while a free slot is left, otherwise it costs coins. Returns the post and coins charged. */
     suspend fun create(activity: String, place: String, at: Instant, description: String?) = apiCall {
         api.createDate(CreateDateBody(activity.trim(), place.trim(), at.toString(), description?.trim()?.ifBlank { null }))
-    }.map { it.date.toDomain() }
+    }.map { it.date.toDomain() to it.charged }
 
     suspend fun delete(dateId: String) = apiCall { api.deleteDate(dateId) }
     suspend fun join(dateId: String) = apiCall { api.requestToJoin(dateId) }

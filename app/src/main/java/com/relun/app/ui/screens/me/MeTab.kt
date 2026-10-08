@@ -1,5 +1,7 @@
 ﻿package com.relun.app.ui.screens.me
 
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.WorkspacePremium
 import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -254,6 +256,41 @@ fun MeTab(wallet: Wallet) {
                 OutlineButton("Edit profile", actions.openEditProfile, Modifier.widthIn(max = 180.dp), leadingIcon = Icons.Outlined.Create, height = 44.dp)
             }
 
+            // Relun Plus
+            val plus = wallet.plus
+            Row(
+                Modifier
+                    .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(if (plus != null) seg.tint else seg.fill)
+                    .clickable(onClick = actions.openPlus)
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                val ink = if (plus != null) seg.text else seg.onFill
+                Icon(Icons.Rounded.WorkspacePremium, null, tint = ink, modifier = Modifier.size(30.dp))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        if (plus != null) "Relun Plus · ${if (plus.plan == "weekly") "Weekly" else "Monthly"}" else "Get Relun Plus",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = if (plus != null) RelunColors.Ink else seg.onFill,
+                    )
+                    Text(
+                        if (plus != null) {
+                            val date = plus.until.atZone(java.time.ZoneId.systemDefault()).format(java.time.format.DateTimeFormatter.ofPattern("d MMM"))
+                            if (plus.autoRenew) "Renews $date" else "Ends $date"
+                        } else {
+                            "Unlimited likes, see who likes you, free message requests"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (plus != null) RelunColors.Body else seg.onFill,
+                    )
+                }
+                Icon(Icons.Rounded.ChevronRight, null, tint = ink, modifier = Modifier.size(22.dp))
+            }
+
             // Insights
             Column(
                 Modifier
@@ -274,7 +311,7 @@ fun MeTab(wallet: Wallet) {
                 }
                 if (!wallet.insightsActive) {
                     PrimaryButton(
-                        "Unlock Likes & Views · ${wallet.insightsCost} coins/month",
+                        "Unlock Likes & Views",
                         actions.openInsights,
                         leadingIcon = Icons.Rounded.LockOpen,
                         height = 48.dp,

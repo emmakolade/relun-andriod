@@ -84,11 +84,24 @@ data class ProfileDto(
     val showDistance: Boolean = true,
 )
 
+/** A paid message to someone the sender hasn't matched with, from the viewer's side. */
+@Serializable
+data class MessageRequestDto(
+    /** "pending", "accepted" or "declined". */
+    val status: String = "pending",
+    /** True for the person who paid to send it. */
+    val outgoing: Boolean = false,
+    /** Messages the sender can still send before a reply. */
+    val remaining: Int = 0,
+)
+
 @Serializable
 data class RelationshipDto(
     val liked: Boolean = false,
     val isMutual: Boolean = false,
-    val chatUnlocked: Boolean = false,
+    /** Whether the viewer can pay to message this person without a match. */
+    val acceptsMessageRequests: Boolean = true,
+    val messageRequest: MessageRequestDto? = null,
 )
 
 /** The {user, profile, photos} envelope every person-listing endpoint returns. */
@@ -97,7 +110,6 @@ data class PersonCardDto(
     val user: UserDto,
     val profile: ProfileDto? = null,
     val photos: List<PhotoDto> = emptyList(),
-    val chatUnlocked: Boolean? = null,
     val relationship: RelationshipDto? = null,
     /** Profile views only: when this person last viewed the user. */
     val viewedAt: String? = null,
@@ -122,6 +134,8 @@ data class LikeResponse(
     val liked: Boolean = true,
     val isMutual: Boolean = false,
     val alreadyLiked: Boolean = false,
+    /** Free likes left today; null with Plus (no limit). */
+    val likesLeft: Int? = null,
 )
 
 // ---------- My profile ----------
@@ -172,7 +186,7 @@ data class MessageDto(
 )
 
 @Serializable
-data class MessagesResponse(val messages: List<MessageDto> = emptyList())
+data class MessagesResponse(val messages: List<MessageDto> = emptyList(), val request: MessageRequestDto? = null)
 
 @Serializable
 data class ConversationUserDto(@SerialName("_id") val id: String, val fullName: String? = null)
@@ -183,11 +197,26 @@ data class ConversationDto(
     val otherUser: ConversationUserDto? = null,
     val lastMessage: MessageDto,
     val unreadCount: Int = 0,
-    val chatUnlocked: Boolean = true,
+    /** Set while the two are talking through a message request, not a match. */
+    val request: MessageRequestDto? = null,
 )
 
 @Serializable
 data class ConversationsResponse(val conversations: List<ConversationDto> = emptyList())
+
+@Serializable
+data class SendRequestBody(val content: String)
+
+@Serializable
+data class SendRequestResponse(
+    /** They already liked the sender, so it became a match instead of a request. */
+    val matched: Boolean = false,
+    val request: MessageRequestDto? = null,
+    val charged: Int = 0,
+    /** Which free allowance paid for it: "free" (weekly) or "plus"; null if coins did. */
+    val freeAllowance: String? = null,
+    val balance: Int = 0,
+)
 
 @Serializable
 data class UnreadCountResponse(val unreadCount: Int = 0)
@@ -204,7 +233,68 @@ data class CoinPackageDto(
 )
 
 @Serializable
-data class CoinCostsDto(val chatUnlock: Int = 15, val insights: Int = 20)
+data class CoinCostsDto(
+    val messageRequest: Int = 200,
+    val insights7: Int = 700,
+    val insights30: Int = 1500,
+    /** A date post beyond the free active ones. */
+    val datePost: Int = 100,
+)
+
+// ---------- Relun Plus ----------
+
+@Serializable
+data class PlusDto(
+    val active: Boolean = false,
+    /** "weekly" or "monthly". */
+    val plan: String = "monthly",
+    /** "paystack" (renewing plan), "paystack_pass" (one-time) or "play". */
+    val source: String = "play",
+    val until: String,
+    val autoRenew: Boolean = false,
+)
+
+@Serializable
+data class PlusPlanDto(
+    val id: String,
+    val days: Int,
+    /** Web price in minor units (kobo); the app shows Google Play's price when it has one. */
+    val amount: Int,
+    val currency: String = "NGN",
+    val playProductId: String = "relun_plus",
+    val playBasePlanId: String,
+)
+
+/** Free likes or message requests left; left is null when unlimited (Plus likes). */
+@Serializable
+data class AllowanceDto(val limit: Int? = null, val left: Int? = null, val resetAt: String? = null)
+
+/** dates: free active date posts left; no reset, a slot frees when a post passes or is deleted. */
+@Serializable
+data class AllowancesDto(
+    val likes: AllowanceDto = AllowanceDto(),
+    val requests: AllowanceDto = AllowanceDto(),
+    val dates: AllowanceDto = AllowanceDto(limit = 1, left = 1),
+)
+
+/** What Plus includes, from the server's settings, so copy never hard-codes it. */
+@Serializable
+data class PlusPerksDto(val monthlyRequests: Int = 5, val activeDates: Int = 3)
+
+/** Plus status and the free allowances. GET /api/plus, and part of the wallet. */
+@Serializable
+data class EntitlementsResponse(
+    val plus: PlusDto? = null,
+    val plusPerks: PlusPerksDto = PlusPerksDto(),
+    val plans: List<PlusPlanDto> = emptyList(),
+    val allowances: AllowancesDto = AllowancesDto(),
+)
+
+@Serializable
+data class PlayPlusBody(val purchaseToken: String, val basePlanId: String?)
+
+@Serializable
+data class InsightsBody(val days: Int)
 
 @Serializable
 data class WalletResponse(
@@ -214,6 +304,10 @@ data class WalletResponse(
     val costs: CoinCostsDto = CoinCostsDto(),
     val packages: List<CoinPackageDto> = emptyList(),
     val pendingBonus: PendingBonusDto? = null,
+    val plus: PlusDto? = null,
+    val plusPerks: PlusPerksDto = PlusPerksDto(),
+    val plans: List<PlusPlanDto> = emptyList(),
+    val allowances: AllowancesDto = AllowancesDto(),
 )
 
 /** Coins the user was given but hasn't been told about yet. kind: "signup" or "gift". */
@@ -226,8 +320,6 @@ data class PurchaseBody(val productId: String, val purchaseToken: String, val pl
 @Serializable
 data class PurchaseResponse(val credited: Int = 0, val balance: Int = 0, val alreadyProcessed: Boolean = false)
 
-@Serializable
-data class UnlockChatResponse(val unlocked: Boolean = false, val charged: Int = 0, val balance: Int = 0)
 
 @Serializable
 data class InsightsResponse(val insightsActive: Boolean = true, val insightsUntil: String? = null, val balance: Int = 0)
@@ -266,7 +358,7 @@ data class CreateDateBody(
 )
 
 @Serializable
-data class CreateDateResponse(val date: DatePostDto)
+data class CreateDateResponse(val date: DatePostDto, val charged: Int = 0, val balance: Int? = null)
 
 @Serializable
 data class RequestStatusBody(val status: String)
@@ -295,6 +387,7 @@ data class SettingsDto(
     val showAge: Boolean = true,
     val showDistance: Boolean = true,
     val notificationsEnabled: Boolean = true,
+    val allowMessageRequests: Boolean = true,
     val maxDistanceKm: Int = 35,
     val ageMin: Int = 18,
     val ageMax: Int = 99,
@@ -310,6 +403,7 @@ data class SettingsPatch(
     val showAge: Boolean? = null,
     val showDistance: Boolean? = null,
     val notificationsEnabled: Boolean? = null,
+    val allowMessageRequests: Boolean? = null,
     val maxDistanceKm: Int? = null,
     val ageMin: Int? = null,
     val ageMax: Int? = null,

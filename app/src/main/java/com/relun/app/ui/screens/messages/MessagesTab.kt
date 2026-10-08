@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -49,14 +50,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.relun.app.data.model.Conversation
 import com.relun.app.data.model.Person
-import com.relun.app.data.model.Wallet
 import com.relun.app.data.network.ApiException
 import com.relun.app.data.repository.PeopleEvent
 import com.relun.app.data.socket.SocketEvent
 import com.relun.app.di.AppContainer
 import com.relun.app.ui.common.relunViewModel
 import com.relun.app.ui.components.Avatar
-import com.relun.app.ui.components.CoinIcon
 import com.relun.app.ui.components.EmptyState
 import com.relun.app.ui.components.OfflineBanner
 import com.relun.app.ui.components.OutlineButton
@@ -75,6 +74,12 @@ import com.relun.app.ui.theme.Relun
 import com.relun.app.ui.theme.RelunColors
 import com.relun.app.util.formatShortAgo
 import kotlinx.coroutines.async
+import androidx.compose.material.icons.outlined.MarkChatUnread
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -91,6 +96,8 @@ data class MessagesState(
     val offline: Boolean = false,
     val newMatches: List<Person> = emptyList(),
     val conversations: List<ConversationRow> = emptyList(),
+    /** Incoming message requests: people who paid to message the user without a match. */
+    val requests: List<ConversationRow> = emptyList(),
     val likesLocked: Boolean = true,
     val likesCount: Int = 0,
     val likers: List<Person> = emptyList(),
@@ -133,14 +140,30 @@ class MessagesViewModel(private val c: AppContainer) : ViewModel() {
             }
             val people = matches.getOrThrow()
             val byId = people.associateBy { it.id }
-            val convs = conversations.getOrThrow().filter { it.userId in byId }
+            val all = conversations.getOrThrow()
+            val convs = all.filter { it.userId in byId && it.request == null }
             val talking = convs.map { it.userId }.toSet()
+
+            // Request conversations are with people who aren't matches, so their cards
+            // come from the profile endpoint. Ones already on screen are reused.
+            val requestConvs = all.filter { it.request != null && it.userId !in byId }
+            val known = (_state.value.conversations + _state.value.requests).mapNotNull { it.person }.associateBy { it.id }
+            val requestPeople = requestConvs.map { conv ->
+                async { known[conv.userId] ?: c.people.person(conv.userId).getOrNull() }
+            }.awaitAll()
+            val requestRows = requestConvs.mapIndexed { i, conv ->
+                ConversationRow(conv, requestPeople[i]?.copy(messageRequest = conv.request))
+            }
+            val rows = (convs.map { conv -> ConversationRow(conv, byId[conv.userId]) } + requestRows.filter { it.conversation.request?.outgoing == true })
+                .sortedByDescending { it.conversation.lastAt }
+
             _state.update {
                 it.copy(
-                    load = if (people.isEmpty()) LoadState.Empty else LoadState.Ready,
+                    load = if (people.isEmpty() && requestRows.isEmpty()) LoadState.Empty else LoadState.Ready,
                     offline = false,
                     newMatches = people.filterNot { p -> p.id in talking },
-                    conversations = convs.map { conv -> ConversationRow(conv, byId[conv.userId]) },
+                    conversations = rows,
+                    requests = requestRows.filter { r -> r.conversation.request?.outgoing == false },
                     likesLocked = likes.getOrNull()?.locked ?: it.likesLocked,
                     likesCount = likes.getOrNull()?.count ?: it.likesCount,
                     likers = likes.getOrNull()?.people ?: it.likers,
@@ -151,7 +174,7 @@ class MessagesViewModel(private val c: AppContainer) : ViewModel() {
 }
 
 @Composable
-fun MessagesTab(showLikes: Int, wallet: Wallet) {
+fun MessagesTab(showLikes: Int) {
     val vm = relunViewModel { MessagesViewModel(it) }
     val s by vm.state.collectAsStateWithLifecycle()
     val actions = LocalAppActions.current
@@ -178,7 +201,7 @@ fun MessagesTab(showLikes: Int, wallet: Wallet) {
             }
 
             if (s.view == MessagesView.Likes) {
-                item { LikesYou(s, wallet) }
+                item { LikesYou(s) }
             } else when (s.load) {
                 LoadState.Loading -> items(5) { SkeletonRow() }
                 LoadState.Empty -> item {
@@ -190,6 +213,14 @@ fun MessagesTab(showLikes: Int, wallet: Wallet) {
                     }
                 }
                 LoadState.Ready -> {
+                    if (s.requests.isNotEmpty()) {
+                        item { SectionHeader("Message requests · ${s.requests.size}", Modifier.padding(start = 20.dp, bottom = 8.dp)) }
+                        item { RequestsNote(onSettings = actions.openSettings) }
+                        items(s.requests, key = { "request-${it.conversation.userId}" }) { row ->
+                            ConversationItem(row) { row.person?.let(actions.openChat) }
+                        }
+                        item { Spacer(Modifier.height(14.dp)) }
+                    }
                     if (s.newMatches.isNotEmpty()) {
                         item { SectionHeader("New matches", Modifier.padding(start = 20.dp, bottom = 8.dp)) }
                         item {
@@ -201,10 +232,7 @@ fun MessagesTab(showLikes: Int, wallet: Wallet) {
                     if (s.conversations.isNotEmpty()) {
                         item { SectionHeader("Conversations", Modifier.padding(start = 20.dp, bottom = 4.dp)) }
                         items(s.conversations, key = { it.conversation.userId }) { row ->
-                            ConversationItem(row) {
-                                val person = row.person ?: return@ConversationItem
-                                actions.openChat(person.copy(chatUnlocked = row.conversation.chatUnlocked || person.chatUnlocked))
-                            }
+                            ConversationItem(row) { row.person?.let(actions.openChat) }
                         }
                     } else if (s.newMatches.isNotEmpty()) {
                         item {
@@ -236,10 +264,40 @@ private fun NewMatch(person: Person, onClick: () -> Unit) {
     }
 }
 
+/** Explains incoming requests and points to the setting that turns them off. */
+@Composable
+private fun RequestsNote(onSettings: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 4.dp)
+            .clip(RoundedCornerShape(14.dp)).background(Color(0xFFF1F1F1)).padding(horizontal = 14.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(Icons.Outlined.MarkChatUnread, null, tint = RelunColors.Body, modifier = Modifier.padding(top = 1.dp).size(17.dp))
+        Text(
+            buildAnnotatedString {
+                append("These people haven’t matched with you. Reply to match, or decline. ")
+                withStyle(SpanStyle(color = RelunColors.Ink, fontWeight = FontWeight.SemiBold, textDecoration = TextDecoration.Underline)) {
+                    append("Turn off message requests")
+                }
+            },
+            style = MaterialTheme.typography.bodySmall.copy(lineHeight = 18.sp),
+            color = RelunColors.Body,
+            modifier = Modifier.clickable(onClick = onSettings),
+        )
+    }
+}
+
 @Composable
 private fun ConversationItem(row: ConversationRow, onClick: () -> Unit) {
     val c = row.conversation
     val unread = c.unread > 0
+    val request = c.request
+    val tag = when {
+        request == null -> null
+        !request.outgoing -> "Request"
+        request.declined -> "Not accepted"
+        else -> "Request sent"
+    }
     Row(
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -263,6 +321,16 @@ private fun ConversationItem(row: ConversationRow, onClick: () -> Unit) {
                 Text(formatShortAgo(c.lastAt), style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp), color = RelunColors.Muted)
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (tag != null) {
+                    val muted = request?.declined == true
+                    Text(
+                        tag,
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                        color = if (muted) RelunColors.Muted else Relun.segment.text,
+                        modifier = Modifier.clip(RoundedCornerShape(50)).background(if (muted) RelunColors.ChipFill else Relun.segment.tint)
+                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                    )
+                }
                 Text(
                     (if (c.lastFromMe) "You: " else "") + c.lastMessage,
                     style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp, fontWeight = if (unread) FontWeight.SemiBold else FontWeight.Normal),
@@ -298,7 +366,7 @@ private fun SkeletonRow() {
 }
 
 @Composable
-private fun LikesYou(s: MessagesState, wallet: Wallet) {
+private fun LikesYou(s: MessagesState) {
     val actions = LocalAppActions.current
     val seg = Relun.segment
     Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -311,15 +379,13 @@ private fun LikesYou(s: MessagesState, wallet: Wallet) {
                     if (s.likesCount == 1) "1 person already likes you" else "${s.likesCount} people already like you",
                     style = MaterialTheme.typography.titleMedium,
                 )
-                Text("See who they are and match instantly. Includes Profile Views for 30 days.", style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp), color = RelunColors.Muted)
+                Text("See who they are and match instantly. Included with Relun Plus, or unlock with coins.", style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp), color = RelunColors.Muted)
                 Row(
                     Modifier.fillMaxWidth().height(50.dp).clip(RoundedCornerShape(16.dp)).background(seg.fill).clickable(onClick = actions.openInsights),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center,
                 ) {
-                    Text("Unlock for ", color = seg.onFill, style = MaterialTheme.typography.labelLarge.copy(fontSize = 16.sp))
-                    CoinIcon(20.dp)
-                    Text(" ${wallet.insightsCost} · 30 days", color = seg.onFill, style = MaterialTheme.typography.labelLarge.copy(fontSize = 16.sp))
+                    Text("See who likes you", color = seg.onFill, style = MaterialTheme.typography.labelLarge.copy(fontSize = 16.sp))
                 }
             }
         }

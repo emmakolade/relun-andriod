@@ -92,7 +92,7 @@ class RelunMessagingService : FirebaseMessagingService() {
         val type = message.data["type"]
         val userId = message.data["userId"]
 
-        if (type == "message" && userId != null && container.chat.openChatUserId == userId) return
+        if ((type == "message" || type == "message_request") && userId != null && container.chat.openChatUserId == userId) return
         container.chat.refreshUnread()
 
         val title = message.notification?.title ?: return

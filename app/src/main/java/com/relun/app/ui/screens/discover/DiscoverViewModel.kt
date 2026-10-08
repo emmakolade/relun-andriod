@@ -1,5 +1,6 @@
 package com.relun.app.ui.screens.discover
 
+import com.relun.app.data.repository.isLikeLimit
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.relun.app.data.model.Person
@@ -48,6 +49,8 @@ class DiscoverViewModel(private val c: AppContainer) : ViewModel() {
                     // A match moves to Messages, so it leaves Discover.
                     is PeopleEvent.Liked -> if (event.isMatch) remove(event.userId) else setLiked(event.userId, true)
                     is PeopleEvent.Unliked -> setLiked(event.userId, false)
+                    // Sending a message request likes them too.
+                    is PeopleEvent.RequestSent -> setLiked(event.userId, true)
                     else -> Unit
                 }
             }
@@ -96,7 +99,8 @@ class DiscoverViewModel(private val c: AppContainer) : ViewModel() {
         viewModelScope.launch {
             c.people.like(person).onFailure { e ->
                 setLiked(person.id, false)
-                c.messenger.error(e.message ?: "Couldn’t like ${person.firstName}.")
+                // Out of likes: the shell shows the Plus offer instead.
+                if (!e.isLikeLimit) c.messenger.error(e.message ?: "Couldn’t like ${person.firstName}.")
             }
         }
     }

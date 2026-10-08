@@ -105,7 +105,7 @@ fun ProfileViewsScreen() {
                 "See who viewed you",
                 if (v.count == 1) "1 person viewed your profile. Unlock to see who." else "${v.count} people viewed your profile. Unlock to see who.",
             ) {
-                PrimaryButton("Unlock for ${wallet.insightsCost} coins", actions.openInsights, Modifier.widthIn(max = 240.dp), height = 48.dp)
+                PrimaryButton("See who viewed you", actions.openInsights, Modifier.widthIn(max = 240.dp), height = 48.dp)
             }
             v.people.isEmpty() -> EmptyState(
                 Icons.Outlined.Visibility,

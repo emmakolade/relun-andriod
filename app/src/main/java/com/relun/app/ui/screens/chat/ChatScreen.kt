@@ -30,7 +30,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.MarkChatUnread
 import androidx.compose.material.icons.outlined.VerifiedUser
+import androidx.compose.material.icons.rounded.Block
+import androidx.compose.material.icons.rounded.MarkChatUnread
 import androidx.compose.material.icons.rounded.AccessTime
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Done
@@ -50,7 +53,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
@@ -59,13 +66,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.relun.app.data.model.ChatMessage
+import com.relun.app.data.model.MessageRequest
 import com.relun.app.data.model.MessageStatus
 import com.relun.app.ui.common.relunViewModel
 import com.relun.app.ui.components.Avatar
 import com.relun.app.ui.components.BackButton
 import com.relun.app.ui.components.CircleIconButton
 import com.relun.app.ui.components.CircleStyle
-import com.relun.app.ui.components.CoinIcon
+import com.relun.app.ui.components.OutlineButton
 import com.relun.app.ui.components.RelunTextField
 import com.relun.app.ui.navigation.LocalAppActions
 import com.relun.app.ui.theme.Outfit
@@ -180,7 +188,7 @@ fun ChatScreen(userId: String, initialName: String) {
             }
             if (s.loading) {
                 item { Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = seg.fill) } }
-            } else if (s.messages.isEmpty() && !s.locked) {
+            } else if (s.messages.isEmpty()) {
                 item { EmptyChat(s, onOpener = { vm.send(it) }) }
             }
             items(items) { item ->
@@ -198,49 +206,140 @@ fun ChatScreen(userId: String, initialName: String) {
             if (s.otherTyping) item { TypingBubble() }
         }
 
-        // Composer, or the unlock prompt when the chat isn't paid for yet.
-        Row(
-            Modifier.fillMaxWidth().background(Color.White).navigationBarsPadding().padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 10.dp),
-            verticalAlignment = Alignment.Bottom,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            val person = s.person
-            if (s.locked && person != null) {
-                Row(
-                    Modifier.weight(1f).heightIn(min = 50.dp).clip(RoundedCornerShape(16.dp)).background(seg.fill).clickable { actions.openChat(person) },
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center,
-                ) {
-                    Text("Unlock chat · ", color = seg.onFill, style = MaterialTheme.typography.labelLarge.copy(fontSize = 16.sp))
-                    CoinIcon(20.dp)
-                    Text(" 15", color = seg.onFill, style = MaterialTheme.typography.labelLarge.copy(fontSize = 16.sp))
-                }
-            } else {
-                RelunTextField(
-                    value = s.draft,
-                    onValueChange = vm::setDraft,
-                    placeholder = "Type a message…",
-                    singleLine = false,
-                    minHeight = 46.dp,
-                    radius = 23.dp,
-                    fill = RelunColors.Background,
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Default),
-                    textStyle = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp, lineHeight = 21.sp),
-                    modifier = Modifier.weight(1f).heightIn(max = 120.dp),
+        // Composer, or why a message request's sender can't write right now.
+        Column(Modifier.fillMaxWidth().background(Color.White).navigationBarsPadding()) {
+            val request = s.request
+            if (request != null && !s.loading) {
+                RequestPanel(
+                    request = request,
+                    name = s.name.substringBefore(' ').ifBlank { s.name },
+                    declining = s.declining,
+                    onDecline = { vm.decline(onDone = actions.back) },
+                    onSettings = actions.openSettings,
                 )
-                val canSend = s.draft.isNotBlank()
-                Box(
-                    Modifier
-                        .size(46.dp)
-                        .clip(CircleShape)
-                        .background(if (canSend) seg.fill else RelunColors.Disabled)
-                        .clickable(enabled = canSend, role = Role.Button, onClickLabel = "Send") { vm.send() },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(Icons.Rounded.ArrowUpward, "Send", tint = if (canSend) seg.onFill else RelunColors.DisabledText, modifier = Modifier.size(22.dp))
+            }
+            Row(
+                Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 10.dp),
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                val person = s.person
+                val block = s.requestBlock
+                val first = s.name.substringBefore(' ').ifBlank { s.name }
+                if (block != null) {
+                    Row(
+                        Modifier.weight(1f).heightIn(min = 50.dp).clip(RoundedCornerShape(16.dp)).background(RelunColors.ChipFill).padding(horizontal = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                    ) {
+                        Icon(
+                            if (block == RequestBlock.Declined) Icons.Rounded.Block else Icons.Rounded.AccessTime,
+                            null,
+                            tint = RelunColors.Body,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Text(
+                            if (block == RequestBlock.Declined) "$first declined your message request" else "Waiting for $first to reply",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                            color = RelunColors.Body,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                } else {
+                    RelunTextField(
+                        value = s.draft,
+                        onValueChange = vm::setDraft,
+                        placeholder = "Type a message…",
+                        singleLine = false,
+                        minHeight = 46.dp,
+                        radius = 23.dp,
+                        fill = RelunColors.Background,
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Default),
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp, lineHeight = 21.sp),
+                        modifier = Modifier.weight(1f).heightIn(max = 120.dp),
+                    )
+                    val canSend = s.draft.isNotBlank()
+                    Box(
+                        Modifier
+                            .size(46.dp)
+                            .clip(CircleShape)
+                            .background(if (canSend) seg.fill else RelunColors.Disabled)
+                            .clickable(enabled = canSend, role = Role.Button, onClickLabel = "Send") { vm.send() },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Rounded.ArrowUpward, "Send", tint = if (canSend) seg.onFill else RelunColors.DisabledText, modifier = Modifier.size(22.dp))
+                    }
                 }
             }
         }
+    }
+}
+
+/**
+ * The message request strip above the composer. The receiver gets the choice
+ * (reply to match, or decline) and a pointer to the setting that turns these
+ * off; the sender sees how many messages they have left.
+ */
+@Composable
+private fun RequestPanel(
+    request: MessageRequest,
+    name: String,
+    declining: Boolean,
+    onDecline: () -> Unit,
+    onSettings: () -> Unit,
+) {
+    val seg = Relun.segment
+    if (request.outgoing) {
+        if (request.declined || request.remaining <= 0) return
+        val left = request.remaining
+        Row(
+            Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Icon(Icons.Outlined.MarkChatUnread, null, tint = RelunColors.Muted, modifier = Modifier.size(16.dp))
+            Text(
+                "Message request · $left ${if (left == 1) "message" else "messages"} left until $name replies",
+                style = MaterialTheme.typography.bodySmall,
+                color = RelunColors.Muted,
+            )
+        }
+        return
+    }
+
+    Column(
+        Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 12.dp)
+            .clip(RoundedCornerShape(20.dp)).background(seg.tint).padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Icon(Icons.Rounded.MarkChatUnread, null, tint = seg.text, modifier = Modifier.padding(top = 1.dp).size(20.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text("$name sent you a message request", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "You haven’t matched. Reply to match and keep chatting, or decline and $name can’t message you again.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = RelunColors.Body,
+                )
+            }
+        }
+        OutlineButton(
+            text = if (declining) "Declining…" else "Decline",
+            onClick = { if (!declining) onDecline() },
+            leadingIcon = Icons.Rounded.Block,
+            height = 42.dp,
+        )
+        Text(
+            buildAnnotatedString {
+                append("Don’t want messages from people you haven’t matched with? ")
+                withStyle(SpanStyle(color = RelunColors.Ink, fontWeight = FontWeight.SemiBold, textDecoration = TextDecoration.Underline)) {
+                    append("Turn off message requests")
+                }
+            },
+            style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+            color = RelunColors.Muted,
+            modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable(role = Role.Button, onClick = onSettings),
+        )
     }
 }
 

@@ -3,7 +3,10 @@ package com.relun.app.data.repository
 import com.relun.app.data.model.ChatMessage
 import com.relun.app.data.model.Conversation
 import com.relun.app.data.model.MessageDto
+import com.relun.app.data.model.MessageRequest
 import com.relun.app.data.model.MessageStatus
+import com.relun.app.data.model.SendRequestBody
+import com.relun.app.data.model.toMessageRequest
 import com.relun.app.data.network.ApiService
 import com.relun.app.data.network.apiCall
 import com.relun.app.data.session.SessionStore
@@ -15,6 +18,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.time.Instant
+
+/** A conversation's messages, and the message request it runs on, if any. */
+data class ChatThread(val messages: List<ChatMessage>, val request: MessageRequest?)
 
 class ChatRepository(
     private val api: ApiService,
@@ -51,7 +57,7 @@ class ChatRepository(
                 lastFromMe = conv.lastMessage.senderId == myId,
                 lastAt = conv.lastMessage.createdAt.toInstant(),
                 unread = conv.unreadCount,
-                chatUnlocked = conv.chatUnlocked,
+                request = conv.request.toMessageRequest(),
             )
         }
     }.onSuccess { list -> _unreadTotal.value = list.count { it.unread > 0 } }
@@ -60,8 +66,19 @@ class ChatRepository(
         scope.launch { conversations() }
     }
 
-    suspend fun history(userId: String): Result<List<ChatMessage>> =
-        apiCall { api.messages(userId) }.map { res -> res.messages.map { it.toChatMessage() } }
+    suspend fun thread(userId: String): Result<ChatThread> =
+        apiCall { api.messages(userId) }.map { res ->
+            ChatThread(res.messages.map { it.toChatMessage() }, res.request.toMessageRequest())
+        }
+
+    /**
+     * Pays to message [userId] without a match. If they already liked the user it
+     * becomes a match instead, for the price of a normal chat unlock.
+     */
+    suspend fun sendRequest(userId: String, content: String) =
+        apiCall { api.sendMessageRequest(userId, SendRequestBody(content.trim())) }
+
+    suspend fun declineRequest(userId: String) = apiCall { api.declineMessageRequest(userId) }
 
     fun MessageDto.toChatMessage(clientId: String? = null) = ChatMessage(
         id = id,

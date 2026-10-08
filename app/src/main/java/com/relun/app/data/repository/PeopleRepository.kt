@@ -2,6 +2,7 @@ package com.relun.app.data.repository
 
 import com.relun.app.data.model.Person
 import com.relun.app.data.model.toPerson
+import com.relun.app.data.network.ApiException
 import com.relun.app.data.network.ApiService
 import com.relun.app.data.network.apiCall
 import java.time.Instant
@@ -24,10 +25,17 @@ sealed interface PeopleEvent {
     data class Passed(val userId: String) : PeopleEvent
     data class Blocked(val userId: String) : PeopleEvent
     data class Unblocked(val userId: String) : PeopleEvent
-    data class ChatUnlocked(val userId: String) : PeopleEvent
+    /** Became a match some other way than a like on screen (a reply, a request). */
+    data class Matched(val userId: String) : PeopleEvent
+    data class RequestSent(val userId: String) : PeopleEvent
+    data class RequestDeclined(val userId: String) : PeopleEvent
     data object InsightsUnlocked : PeopleEvent
+    data object PlusChanged : PeopleEvent
     data object MatchesChanged : PeopleEvent
 }
+
+/** A like refused because today's free likes are used up. */
+val Throwable.isLikeLimit: Boolean get() = this is ApiException && code == "LIKE_LIMIT"
 
 /** Discover, profiles, likes and matches. Emits [newMatches] when a like is mutual. */
 class PeopleRepository(private val api: ApiService) {
@@ -38,13 +46,19 @@ class PeopleRepository(private val api: ApiService) {
     private val _events = MutableSharedFlow<PeopleEvent>(extraBufferCapacity = 16)
     val events: SharedFlow<PeopleEvent> = _events.asSharedFlow()
 
+    private val _likeLimitReached = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    /** A like was refused because today's free likes are used up; the shell offers Plus. */
+    val likeLimitReached: SharedFlow<Unit> = _likeLimitReached.asSharedFlow()
+
     suspend fun discover(latitude: Double?, longitude: Double?) =
         apiCall { api.discover(latitude, longitude) }.map { res -> res.users.map { it.toPerson() } }
 
     suspend fun person(userId: String) = apiCall { api.person(userId) }.map { it.toPerson() }
 
-    /** Likes [person]. Returns true when it made a match. */
-    suspend fun like(person: Person): Result<Boolean> = apiCall { api.like(person.id) }.map { res ->
+    /** Likes [person]. Returns true when it made a match. Fails with [isLikeLimit] when out of likes. */
+    suspend fun like(person: Person): Result<Boolean> = apiCall { api.like(person.id) }.onFailure { e ->
+        if (e.isLikeLimit) _likeLimitReached.tryEmit(Unit)
+    }.map { res ->
         if (res.isMutual && !res.alreadyLiked) {
             _newMatches.tryEmit(person.copy(isMatch = true, liked = true))
         }

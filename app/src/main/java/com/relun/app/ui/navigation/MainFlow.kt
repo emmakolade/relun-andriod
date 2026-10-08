@@ -28,8 +28,10 @@ import com.relun.app.ui.screens.settings.BlockedUsersScreen
 import com.relun.app.ui.screens.settings.SettingsScreen
 import com.relun.app.ui.screens.sheets.CoinsSheet
 import com.relun.app.ui.screens.sheets.InsightsSheet
+import com.relun.app.ui.screens.sheets.MessageRequestSheet
 import com.relun.app.ui.screens.sheets.MoreSheet
-import com.relun.app.ui.screens.sheets.UnlockChatSheet
+import com.relun.app.ui.screens.sheets.LikeLimitSheet
+import com.relun.app.ui.screens.sheets.PlusSheet
 import com.relun.app.ui.screens.sheets.WelcomeCoinsSheet
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filterNotNull
@@ -40,6 +42,8 @@ class AppActions(
     val openChat: (Person) -> Unit,
     val openCoins: () -> Unit,
     val openInsights: () -> Unit,
+    /** Relun Plus: plans, or the user's own status. */
+    val openPlus: () -> Unit,
     /** Messages tab, "Likes You". */
     val openLikes: () -> Unit,
     val openMore: (Person) -> Unit,
@@ -60,6 +64,7 @@ fun MainFlow(pendingPush: MutableStateFlow<PushTarget?>) {
     val state by vm.state.collectAsStateWithLifecycle()
     val wallet by vm.wallet.collectAsStateWithLifecycle()
     val prices by vm.prices.collectAsStateWithLifecycle()
+    val plusPrices by vm.plusPrices.collectAsStateWithLifecycle()
     val activity = LocalActivity.current
 
     val actions = remember(nav, vm) {
@@ -68,6 +73,7 @@ fun MainFlow(pendingPush: MutableStateFlow<PushTarget?>) {
             openChat = vm::openChat,
             openCoins = { vm.openCoins() },
             openInsights = vm::openInsights,
+            openPlus = vm::openPlus,
             openLikes = vm::showLikes,
             openMore = vm::openMore,
             openSettings = { nav.navigate(SettingsRoute) { launchSingleTop = true } },
@@ -92,7 +98,7 @@ fun MainFlow(pendingPush: MutableStateFlow<PushTarget?>) {
         pendingPush.filterNotNull().collect { target ->
             pendingPush.value = null
             when (target.type) {
-                "message" -> target.userId?.let { nav.navigate(ChatRoute(it, "")) { launchSingleTop = true } }
+                "message", "message_request" -> target.userId?.let { nav.navigate(ChatRoute(it, "")) { launchSingleTop = true } }
                 "match" -> target.userId?.let { nav.navigate(PersonRoute(it)) { launchSingleTop = true } }
                     ?: vm.selectTab(Tab.Messages)
                 "date_request" -> {
@@ -140,14 +146,32 @@ fun MainFlow(pendingPush: MutableStateFlow<PushTarget?>) {
                     onBuy = { activity?.let(vm::buy) },
                     onDismiss = vm::closeSheet,
                 )
-                is MainSheet.Unlock -> UnlockChatSheet(
+                is MainSheet.Request -> MessageRequestSheet(
                     person = sheet.person,
                     wallet = wallet,
-                    unlocking = state.unlocking,
-                    onUnlock = { vm.unlock(sheet.person) },
+                    draft = state.requestDraft,
+                    sending = state.sendingRequest,
+                    onDraft = vm::setRequestDraft,
+                    onSend = { vm.sendRequest(sheet.person) },
+                    onPlus = vm::openPlus,
                     onDismiss = vm::closeSheet,
                 )
-                MainSheet.Insights -> InsightsSheet(wallet = wallet, onUnlock = vm::buyInsights, onDismiss = vm::closeSheet)
+                MainSheet.Insights -> InsightsSheet(
+                    wallet = wallet,
+                    plusPrices = plusPrices,
+                    buying = state.buyingInsights,
+                    onPlus = vm::openPlus,
+                    onBuy = vm::buyInsights,
+                    onDismiss = vm::closeSheet,
+                )
+                MainSheet.Plus -> PlusSheet(
+                    wallet = wallet,
+                    plusPrices = plusPrices,
+                    buying = state.buying,
+                    onBuy = { basePlan -> activity?.let { vm.buyPlus(it, basePlan) } },
+                    onDismiss = vm::closeSheet,
+                )
+                MainSheet.LikeLimit -> LikeLimitSheet(wallet = wallet, onPlus = vm::openPlus, onDismiss = vm::closeSheet)
                 is MainSheet.Bonus -> WelcomeCoinsSheet(bonus = sheet.bonus, wallet = wallet, onDismiss = vm::closeSheet)
                 is MainSheet.More -> MoreSheet(
                     person = sheet.person,

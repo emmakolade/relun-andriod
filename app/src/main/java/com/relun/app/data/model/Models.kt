@@ -32,13 +32,32 @@ data class Person(
     val city: String?,
     val interests: List<String>,
     val liked: Boolean = false,
+    /** Matches chat for free. */
     val isMatch: Boolean = false,
-    val chatUnlocked: Boolean = false,
+    /** Whether the user can pay to message them without a match. */
+    val acceptsMessageRequests: Boolean = true,
+    /** Set while the two are talking through a message request rather than a match. */
+    val messageRequest: MessageRequest? = null,
 ) {
     val firstName: String get() = name.substringBefore(' ').ifBlank { name }
     val initial: String get() = name.firstOrNull()?.uppercase() ?: "?"
     val mainPhotoUrl: String? get() = photos.firstOrNull()?.url
 }
+
+/**
+ * A paid message to someone the sender hasn't matched with. Accepted requests
+ * are just matches, so only pending and declined ones are kept.
+ */
+data class MessageRequest(
+    val declined: Boolean,
+    /** True for the person who paid to send it. */
+    val outgoing: Boolean,
+    /** Messages the sender can still send before a reply. */
+    val remaining: Int,
+)
+
+fun MessageRequestDto?.toMessageRequest(): MessageRequest? =
+    if (this == null || status == "accepted") null else MessageRequest(status == "declined", outgoing, remaining)
 
 fun PersonCardDto.toPerson(): Person = Person(
     id = user.id,
@@ -58,8 +77,9 @@ fun PersonCardDto.toPerson(): Person = Person(
     city = profile?.city?.takeIf { it.isNotBlank() },
     interests = profile?.interests.orEmpty().filter { it.isNotBlank() },
     liked = relationship?.liked ?: false,
-    isMatch = relationship?.isMutual ?: (chatUnlocked != null),
-    chatUnlocked = relationship?.chatUnlocked ?: chatUnlocked ?: false,
+    isMatch = relationship?.isMutual ?: false,
+    acceptsMessageRequests = relationship?.acceptsMessageRequests ?: true,
+    messageRequest = relationship?.messageRequest.toMessageRequest(),
 )
 
 enum class MessageStatus { Sending, Sent, Read, Failed }
@@ -81,18 +101,50 @@ data class Conversation(
     val lastFromMe: Boolean,
     val lastAt: Instant,
     val unread: Int,
-    val chatUnlocked: Boolean,
+    val request: MessageRequest? = null,
 )
+
+data class Plus(
+    /** "weekly" or "monthly". */
+    val plan: String,
+    /** "paystack", "paystack_pass" or "play". */
+    val source: String,
+    val until: Instant,
+    val autoRenew: Boolean,
+)
+
+/** Free likes or message requests left. [left] is null when unlimited (Plus likes). */
+data class Allowance(val limit: Int? = null, val left: Int? = null, val resetAt: Instant? = null)
 
 data class Wallet(
     val balance: Int = 0,
+    /** Likes & Views, from a coin pass or from Plus. */
     val insightsActive: Boolean = false,
-    val chatUnlockCost: Int = 15,
-    val insightsCost: Int = 20,
+    val messageRequestCost: Int = 200,
+    val insights7Cost: Int = 700,
+    val insights30Cost: Int = 1500,
+    /** A date post beyond the free active ones. */
+    val datePostCost: Int = 100,
     val packages: List<CoinPackageDto> = emptyList(),
     /** Shown once on the main screen, then marked seen. */
     val pendingBonus: PendingBonusDto? = null,
+    /** Null without Plus (never had it, or it lapsed). */
+    val plus: Plus? = null,
+    val plans: List<PlusPlanDto> = emptyList(),
+    /** What Plus includes, so copy never hard-codes it. */
+    val plusPerks: PlusPerksDto = PlusPerksDto(),
+    val likes: Allowance = Allowance(),
+    val requests: Allowance = Allowance(limit = 1, left = 0),
+    /** Free active date posts left. */
+    val dates: Allowance = Allowance(limit = 1, left = 1),
 )
+
+private fun String?.toInstantOrNull(): Instant? = this?.let { runCatching { Instant.parse(it) }.getOrNull() }
+
+fun AllowanceDto.toAllowance() = Allowance(limit, left, resetAt.toInstantOrNull())
+
+fun PlusDto?.toPlus(): Plus? =
+    if (this == null || !active) null else Plus(plan, source, until.toInstantOrNull() ?: Instant.now(), autoRenew)
 
 enum class DateRequestStatus {
     Pending, Accepted, Declined;

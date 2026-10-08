@@ -88,7 +88,7 @@ fun MainScreen(shell: MainViewModel, state: MainUiState, wallet: Wallet) {
             when (tab) {
                 Tab.Discover -> DiscoverTab(wallet = wallet)
                 Tab.Dates -> DatesTab(showMine = state.showMyDates)
-                Tab.Messages -> MessagesTab(showLikes = state.showLikes, wallet = wallet)
+                Tab.Messages -> MessagesTab(showLikes = state.showLikes)
                 Tab.Me -> MeTab(wallet = wallet)
             }
         }

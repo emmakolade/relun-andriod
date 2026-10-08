@@ -108,7 +108,7 @@ fun DiscoverTab(wallet: Wallet) {
                         "Discover",
                         below = { SegmentPill(text = "${Relun.segment.label} · nearby", small = true) },
                     ) {
-                        CoinPill(wallet.balance, low = wallet.balance < wallet.chatUnlockCost, onClick = actions.openCoins)
+                        CoinPill(wallet.balance, low = wallet.balance < wallet.messageRequestCost, onClick = actions.openCoins)
                         CircleIconButton(Icons.Outlined.Tune, "Filters", { vm.openFilters(true) })
                     }
                     Row(
