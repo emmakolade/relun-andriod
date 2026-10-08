@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The two linked rings, sized for the 288dp splash icon box (only the centre
+  192dp circle shows). Matches RingsMark(164.dp) on the loading screen.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="288dp"
+    android:height="288dp"
+    android:viewportWidth="400"
+    android:viewportHeight="400">
+    <path
+        android:strokeColor="#E0245E"
+        android:strokeWidth="27.9"
+        android:pathData="M100.8,200a65.1,65.1 0,1 0,130.2 0a65.1,65.1 0,1 0,-130.2 0z" />
+    <path
+        android:strokeColor="#FF9F1C"
+        android:strokeWidth="27.9"
+        android:pathData="M169,200a65.1,65.1 0,1 0,130.2 0a65.1,65.1 0,1 0,-130.2 0z" />
+    <!-- Linked: rose passes over orange at the top crossing, under it at the bottom. -->
+    <group>
+        <clip-path android:pathData="M165.9,0h234.1v200h-234.1z" />
+        <path
+            android:strokeColor="#E0245E"
+            android:strokeWidth="27.9"
+            android:pathData="M100.8,200a65.1,65.1 0,1 0,130.2 0a65.1,65.1 0,1 0,-130.2 0z" />
+    </group>
+</vector>

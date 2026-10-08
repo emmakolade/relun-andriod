@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Relun" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@android:color/white</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+
+    <!-- The rings on white, like the launcher icon; the loading screen continues it. -->
+    <style name="Theme.Relun.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/relun_splash</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_rings</item>
+        <item name="postSplashScreenTheme">@style/Theme.Relun</item>
+    </style>
+</resources>

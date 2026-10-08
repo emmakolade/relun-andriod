@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Two linked rings: rose for Relationship, orange for Fun. Kept inside the
+  adaptive icon's 66dp safe zone so no launcher mask clips them.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:strokeColor="#E0245E"
+        android:strokeWidth="7.5"
+        android:pathData="M25.75,54a17.25,17.25 0,1 0,34.5 0a17.25,17.25 0,1 0,-34.5 0z" />
+    <path
+        android:strokeColor="#FF9F1C"
+        android:strokeWidth="7.5"
+        android:pathData="M47.75,54a17.25,17.25 0,1 0,34.5 0a17.25,17.25 0,1 0,-34.5 0z" />
+    <!-- Linked: rose passes over orange at the top crossing, under it at the bottom. -->
+    <group>
+        <clip-path android:pathData="M43,0h65v54h-65z" />
+        <path
+            android:strokeColor="#E0245E"
+            android:strokeWidth="7.5"
+            android:pathData="M25.75,54a17.25,17.25 0,1 0,34.5 0a17.25,17.25 0,1 0,-34.5 0z" />
+    </group>
+</vector>

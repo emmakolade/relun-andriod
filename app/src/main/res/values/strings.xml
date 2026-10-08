@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Relun</string>
+    <string name="channel_messages">Messages and matches</string>
+    <string name="channel_messages_desc">New messages, matches and date requests</string>
+</resources>
