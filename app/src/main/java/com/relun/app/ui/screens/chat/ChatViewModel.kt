@@ -189,7 +189,7 @@ class ChatViewModel(private val c: AppContainer, private val userId: String, ini
                     "REQUEST_DECLINED" -> _state.update { it.copy(request = it.request?.copy(declined = true, remaining = 0)) }
                 }
             }
-            is SocketEvent.MessageNotification -> Unit
+            is SocketEvent.MessageNotification, is SocketEvent.Notification -> Unit
         }
     }
 

@@ -1,6 +1,5 @@
 package com.relun.app.ui.screens.profile
 
-import com.relun.app.data.repository.isLikeLimit
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -25,6 +24,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Person
@@ -33,7 +33,6 @@ import androidx.compose.material.icons.outlined.SmokeFree
 import androidx.compose.material.icons.outlined.Straighten
 import androidx.compose.material.icons.outlined.WineBar
 import androidx.compose.material.icons.outlined.WorkOutline
-import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.rounded.ChatBubble
 import androidx.compose.material.icons.rounded.ChatBubbleOutline
 import androidx.compose.material.icons.rounded.Close
@@ -66,6 +65,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.relun.app.data.model.Person
 import com.relun.app.data.repository.PeopleEvent
+import com.relun.app.data.repository.isLikeLimit
 import com.relun.app.di.AppContainer
 import com.relun.app.ui.common.relunViewModel
 import com.relun.app.ui.components.BackButton

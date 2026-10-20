@@ -9,14 +9,15 @@ import com.relun.app.data.model.DateRequestStatus
 import com.relun.app.data.network.ApiException
 import com.relun.app.data.repository.PeopleEvent
 import com.relun.app.di.AppContainer
+import com.relun.app.push.PushAskReason
 import com.relun.app.ui.components.DialogSpec
 import com.relun.app.ui.screens.main.LoadState
+import java.time.Instant
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.time.Instant
 
 enum class DatesView { Browse, Mine }
 
@@ -126,6 +127,7 @@ class DatesViewModel(private val c: AppContainer) : ViewModel() {
                     // A free slot was used, or coins spent; the server has the counts.
                     launch { c.coins.refresh() }
                     c.messenger.success(if (charged > 0) "Your date is live · −$charged coins" else "Your date is live")
+                    c.pushAsk.request(PushAskReason.Date)
                 }
                 .onFailure { e ->
                     _state.update { it.copy(posting = false) }

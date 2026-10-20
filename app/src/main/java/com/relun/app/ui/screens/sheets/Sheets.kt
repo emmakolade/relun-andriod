@@ -1,22 +1,13 @@
 package com.relun.app.ui.screens.sheets
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.material.icons.outlined.FavoriteBorder
-import androidx.compose.material.icons.rounded.ChevronRight
-import androidx.compose.material.icons.rounded.HeartBroken
-import androidx.compose.material.icons.rounded.Redeem
-import androidx.compose.material.icons.rounded.WorkspacePremium
-import androidx.compose.ui.platform.LocalUriHandler
-import com.relun.app.data.model.PlusPlanDto
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
@@ -26,25 +17,32 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material.icons.outlined.Event
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.MarkChatUnread
 import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Error
 import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.HeartBroken
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.NotificationsActive
+import androidx.compose.material.icons.rounded.Redeem
+import androidx.compose.material.icons.rounded.WorkspacePremium
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
@@ -52,7 +50,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.relun.app.data.model.PendingBonusDto
 import com.relun.app.data.model.Person
+import com.relun.app.data.model.PlusPlanDto
 import com.relun.app.data.model.Wallet
+import com.relun.app.push.PushAskReason
 import com.relun.app.ui.components.Avatar
 import com.relun.app.ui.components.CoinIcon
 import com.relun.app.ui.components.LinkButton
@@ -63,6 +63,8 @@ import com.relun.app.ui.components.RelunTextField
 import com.relun.app.ui.theme.Relun
 import com.relun.app.ui.theme.RelunColors
 import com.relun.app.util.formatCoins
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 @Composable
@@ -539,5 +541,51 @@ private fun SheetAction(icon: ImageVector, text: String, color: Color, onClick: 
     ) {
         Icon(icon, null, tint = color, modifier = Modifier.size(22.dp))
         Text(text, color = color, style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium))
+    }
+}
+
+private fun pushCopy(reason: PushAskReason): Pair<String, String> = when (reason) {
+    PushAskReason.Login -> "Turn on notifications" to "Know the moment someone likes you, matches with you or messages you."
+    PushAskReason.Match -> "Don’t miss their reply" to "Turn on notifications to hear the moment your match messages you."
+    PushAskReason.Request -> "Know when they answer" to "Turn on notifications and we’ll tell you as soon as they reply."
+    PushAskReason.Date -> "Know when someone wants to join" to "Turn on notifications to hear about requests to join your date."
+}
+
+/**
+ * Our own ask before Android's notification prompt. "Turn on" shows the real
+ * prompt; if Android won't show it any more, it opens Relun's notification
+ * settings instead.
+ */
+@Composable
+fun PushAskSheet(
+    reason: PushAskReason,
+    blocked: Boolean,
+    onTurnOn: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val seg = Relun.segment
+    val (title, body) = pushCopy(reason)
+    RelunSheet(onDismiss) {
+        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(Modifier.size(64.dp).clip(RoundedCornerShape(20.dp)).background(seg.tint), contentAlignment = Alignment.Center) {
+                Icon(Icons.Rounded.NotificationsActive, null, tint = seg.text, modifier = Modifier.size(30.dp))
+            }
+            Text(title, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
+            Text(body, style = MaterialTheme.typography.bodyMedium, color = RelunColors.Muted, textAlign = TextAlign.Center)
+            if (blocked) {
+                Text(
+                    "Notifications are off for Relun. Turn them on in your phone’s settings.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = RelunColors.Body,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(RelunColors.ChipFill).padding(horizontal = 14.dp, vertical = 12.dp),
+                )
+                PrimaryButton("Open settings", onOpenSettings, leadingIcon = Icons.Rounded.NotificationsActive)
+            } else {
+                PrimaryButton("Turn on notifications", onTurnOn, leadingIcon = Icons.Rounded.NotificationsActive)
+            }
+            LinkButton("Not now", onDismiss, Modifier.fillMaxWidth())
+        }
     }
 }

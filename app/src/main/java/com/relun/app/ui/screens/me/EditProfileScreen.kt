@@ -1,20 +1,25 @@
 package com.relun.app.ui.screens.me
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,7 +30,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -79,7 +87,14 @@ fun EditProfileScreen() {
             LabeledField("Interests", trailingLabel = "Comma separated") {
                 RelunTextField(interests, { interests = it.take(200) }, Modifier.fillMaxWidth(), placeholder = "Jazz, Hiking, Cooking")
             }
-            InfoNote("Your date of birth and what you’re looking for can’t be changed.", Icons.Rounded.Lock)
+            me?.email?.let { LabeledField("Email") { LockedValue(it) } }
+            me?.phone?.let { LabeledField("Phone") { LockedValue(it) } }
+            val locked = when {
+                me?.email != null -> "email, "
+                me?.phone != null -> "phone number, "
+                else -> ""
+            }
+            InfoNote("Your ${locked}date of birth and what you’re looking for can’t be changed.", Icons.Rounded.Lock)
         }
         PrimaryButton(
             "Save",
@@ -106,5 +121,31 @@ fun EditProfileScreen() {
             loading = saving,
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
         )
+    }
+}
+
+/** A field shown for reference only, like the sign-in email: greyed, with a lock. */
+@Composable
+private fun LockedValue(text: String) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(54.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .border(1.5.dp, RelunColors.Border, RoundedCornerShape(16.dp))
+            .background(RelunColors.ChipFill)
+            .padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(
+            text,
+            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 17.sp, fontWeight = FontWeight.Medium),
+            color = RelunColors.Body,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Icon(Icons.Rounded.Lock, "Can’t be changed", tint = RelunColors.Muted, modifier = Modifier.size(18.dp))
     }
 }

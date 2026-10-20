@@ -1,12 +1,12 @@
 package com.relun.app.ui.screens.discover
 
-import com.relun.app.data.repository.isLikeLimit
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.relun.app.data.model.Person
 import com.relun.app.data.model.SettingsPatch
 import com.relun.app.data.network.ApiException
 import com.relun.app.data.repository.PeopleEvent
+import com.relun.app.data.repository.isLikeLimit
 import com.relun.app.di.AppContainer
 import com.relun.app.ui.screens.main.LoadState
 import kotlinx.coroutines.flow.MutableStateFlow

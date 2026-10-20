@@ -140,6 +140,16 @@ interface ApiService {
     @POST("api/safety/reports/{userId}")
     suspend fun report(@Path("userId") userId: String, @Body body: ReportBody): ResponseBody
 
+    // ---------- Notifications ----------
+    @GET("api/notifications")
+    suspend fun notifications(): NotificationsResponse
+
+    @GET("api/notifications/unread-count")
+    suspend fun notificationsUnread(): UnreadNotificationsResponse
+
+    @POST("api/notifications/read")
+    suspend fun markNotificationsRead(): UnreadNotificationsResponse
+
     // ---------- Relun Plus ----------
     @GET("api/plus")
     suspend fun plus(): EntitlementsResponse

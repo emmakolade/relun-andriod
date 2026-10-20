@@ -412,6 +412,37 @@ data class SettingsPatch(
 @Serializable
 data class PushTokenBody(val token: String, val platform: String = "android", val provider: String = "fcm")
 
+// ---------- Notifications ----------
+
+@Serializable
+data class NotificationActorDto(val id: String, val name: String? = null, val photoUrl: String? = null)
+
+@Serializable
+data class NotificationDataDto(val userId: String? = null)
+
+/**
+ * One entry in the list behind the bell. type: match, like, view,
+ * message_request, date_request, date_accepted, plus or coins. actor is null
+ * when there's no other person, or it's hidden (likes and views without Likes & Views).
+ */
+@Serializable
+data class NotificationDto(
+    val id: String,
+    val type: String,
+    val title: String,
+    val body: String,
+    val createdAt: String,
+    val read: Boolean = false,
+    val actor: NotificationActorDto? = null,
+    val data: NotificationDataDto = NotificationDataDto(),
+)
+
+@Serializable
+data class NotificationsResponse(val notifications: List<NotificationDto> = emptyList(), val unreadCount: Int = 0)
+
+@Serializable
+data class UnreadNotificationsResponse(val unreadCount: Int = 0)
+
 // ---------- Errors ----------
 
 @Serializable

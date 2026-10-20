@@ -8,7 +8,9 @@ import com.relun.app.data.model.PendingBonusDto
 import com.relun.app.data.model.Person
 import com.relun.app.data.repository.PeopleEvent
 import com.relun.app.di.AppContainer
+import com.relun.app.push.PushAskReason
 import com.relun.app.ui.components.DialogSpec
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -31,6 +33,8 @@ sealed interface MainSheet {
     data object Plus : MainSheet
     /** Out of free likes for today. */
     data object LikeLimit : MainSheet
+    /** Our own "turn on notifications" card, before Android's prompt. */
+    data class PushAsk(val reason: PushAskReason) : MainSheet
     data class More(val person: Person) : MainSheet
     data class Bonus(val bonus: PendingBonusDto) : MainSheet
 }
@@ -76,6 +80,7 @@ class MainViewModel(private val c: AppContainer) : ViewModel() {
 
     init {
         viewModelScope.launch { c.people.newMatches.collect { p -> _state.update { it.copy(match = p) } } }
+        viewModelScope.launch { c.pushAsk.requests.collect { offerPushAsk(it) } }
         viewModelScope.launch {
             c.people.likeLimitReached.collect {
                 c.coins.refresh()
@@ -137,7 +142,38 @@ class MainViewModel(private val c: AppContainer) : ViewModel() {
         (_state.value.sheet as? MainSheet.Bonus)?.let { viewModelScope.launch { c.coins.markBonusSeen(it.bonus.id) } }
         _state.update { it.copy(sheet = null, buying = false) }
     }
-    fun dismissMatch() = _state.update { it.copy(match = null) }
+    fun dismissMatch() {
+        val had = _state.value.match != null
+        _state.update { it.copy(match = null) }
+        if (had) offerPushAsk(PushAskReason.Match)
+    }
+
+    /**
+     * Shows the notifications card if it's a good time: nothing else is open,
+     * they didn't turn notifications off in Relun's Settings, and the
+     * once-a-week, three-times-in-all limits allow it.
+     */
+    fun offerPushAsk(reason: PushAskReason, delayMs: Long = 700) {
+        viewModelScope.launch {
+            delay(delayMs)
+            val s = _state.value
+            if (s.sheet != null || s.match != null) return@launch
+            if (!c.settings.settings.value.notificationsEnabled || !c.pushAsk.shouldAsk()) return@launch
+            c.pushAsk.markAsked()
+            _state.update { it.copy(sheet = MainSheet.PushAsk(reason)) }
+        }
+    }
+
+    /** Android's prompt answered, from the card's "Turn on". */
+    fun onPushPermission(granted: Boolean) {
+        _state.update { it.copy(sheet = null) }
+        if (granted) {
+            c.push.register()
+            c.messenger.success("Notifications are on")
+        } else {
+            c.messenger.info("Notifications stay off. You can turn them on any time in Settings.")
+        }
+    }
     fun dismissDialog() = _state.update { it.copy(dialog = null) }
     fun selectPackage(index: Int) = _state.update { it.copy(selectedPackage = index) }
 
@@ -146,7 +182,9 @@ class MainViewModel(private val c: AppContainer) : ViewModel() {
      * offers to send a request.
      */
     fun openChat(person: Person) {
+        val fromMatch = _state.value.match != null
         _state.update { it.copy(match = null) }
+        if (fromMatch) offerPushAsk(PushAskReason.Match, delayMs = 1200)
         if (person.isMatch || person.messageRequest != null) {
             _nav.tryEmit(NavEvent.OpenChat(person.id, person.name))
             return
@@ -194,6 +232,7 @@ class MainViewModel(private val c: AppContainer) : ViewModel() {
                         )
                     }
                     _nav.tryEmit(NavEvent.OpenChat(person.id, person.name))
+                    offerPushAsk(PushAskReason.Request, delayMs = 1200)
                 }
                 .onFailure { error ->
                     _state.update { it.copy(sendingRequest = false) }

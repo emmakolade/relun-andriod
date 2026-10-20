@@ -23,6 +23,8 @@ sealed interface SocketEvent {
     data class Read(val conversationId: String, val readBy: String) : SocketEvent
     data class Presence(val userId: String, val isOnline: Boolean) : SocketEvent
     data class Error(val message: String, val code: String?, val clientId: String?) : SocketEvent
+    /** Something new in the notification list; carries the bell's count. */
+    data class Notification(val unreadCount: Int) : SocketEvent
 }
 
 /**
@@ -82,6 +84,9 @@ class ChatSocket(private val baseUrl: String, private val session: SessionStore)
 
         created.on("new_message") { args -> parseMessageEvent(args)?.let { (msg, clientId) -> emit(SocketEvent.NewMessage(msg, clientId)) } }
         created.on("message_notification") { args -> parseMessageEvent(args)?.let { (msg, _) -> emit(SocketEvent.MessageNotification(msg)) } }
+        created.on("notification") { args ->
+            (args.firstOrNull() as? JSONObject)?.let { emit(SocketEvent.Notification(it.optInt("unreadCount"))) }
+        }
         created.on("user_typing") { args ->
             (args.firstOrNull() as? JSONObject)?.let {
                 emit(SocketEvent.Typing(it.optString("userId"), it.optBoolean("isTyping")))

@@ -94,6 +94,7 @@ class RelunMessagingService : FirebaseMessagingService() {
 
         if ((type == "message" || type == "message_request") && userId != null && container.chat.openChatUserId == userId) return
         container.chat.refreshUnread()
+        container.inbox.refreshUnread()
 
         val title = message.notification?.title ?: return
         val body = message.notification?.body.orEmpty()

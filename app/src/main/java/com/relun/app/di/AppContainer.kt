@@ -11,6 +11,7 @@ import com.relun.app.data.repository.AuthState
 import com.relun.app.data.repository.ChatRepository
 import com.relun.app.data.repository.CoinsRepository
 import com.relun.app.data.repository.DatesRepository
+import com.relun.app.data.repository.InboxRepository
 import com.relun.app.data.repository.PeopleRepository
 import com.relun.app.data.repository.ProfileRepository
 import com.relun.app.data.repository.SafetyRepository
@@ -18,6 +19,7 @@ import com.relun.app.data.repository.SettingsRepository
 import com.relun.app.data.session.SessionStore
 import com.relun.app.data.socket.ChatSocket
 import com.relun.app.location.LocationProvider
+import com.relun.app.push.PushAskPolicy
 import com.relun.app.push.PushRegistrar
 import com.relun.app.ui.common.Messenger
 import kotlinx.coroutines.CoroutineScope
@@ -50,6 +52,7 @@ class AppContainer(app: Application) {
     val profile = ProfileRepository(api)
     val people = PeopleRepository(api)
     val chat = ChatRepository(api, socket, session, scope)
+    val inbox = InboxRepository(api, socket, scope)
     val coins = CoinsRepository(api)
     val dates = DatesRepository(api)
     val safety = SafetyRepository(api, people)
@@ -57,6 +60,7 @@ class AppContainer(app: Application) {
     val location = LocationProvider(app)
     val billing = BillingManager(app, coins, scope)
     val push = PushRegistrar(app, api, session, scope)
+    val pushAsk = PushAskPolicy(app)
 
     private var foreground = false
 
@@ -67,6 +71,7 @@ class AppContainer(app: Application) {
             profile.clear()
             coins.clear()
             chat.clear()
+            inbox.clear()
             settings.clear()
         }
 
@@ -86,6 +91,7 @@ class AppContainer(app: Application) {
                 launch { settings.refresh() }
                 launch { billing.reconcile() }
                 chat.refreshUnread()
+                inbox.refreshUnread()
             }
         }
 
@@ -106,6 +112,7 @@ class AppContainer(app: Application) {
                 if (auth.state.value == AuthState.SignedIn) {
                     socket.connect()
                     chat.refreshUnread()
+                    inbox.refreshUnread()
                     scope.launch { coins.refresh() }
                 }
             }

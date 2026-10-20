@@ -21,6 +21,7 @@ import kotlinx.serialization.Serializable
 @Serializable data object BlockedRoute
 @Serializable data object EditProfileRoute
 @Serializable data object ProfileViewsRoute
+@Serializable data object NotificationsRoute
 
 /** Where a notification tap should land. */
 data class PushTarget(val type: String, val userId: String?)

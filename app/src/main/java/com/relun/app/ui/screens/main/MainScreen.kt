@@ -1,9 +1,5 @@
 package com.relun.app.ui.screens.main
 
-import android.Manifest
-import android.os.Build
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -54,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.relun.app.data.model.Wallet
+import com.relun.app.push.PushAskReason
 import com.relun.app.ui.common.appContainer
 import com.relun.app.ui.navigation.MainUiState
 import com.relun.app.ui.navigation.MainViewModel
@@ -64,6 +61,7 @@ import com.relun.app.ui.screens.me.MeTab
 import com.relun.app.ui.screens.messages.MessagesTab
 import com.relun.app.ui.theme.Relun
 import com.relun.app.ui.theme.RelunColors
+import kotlinx.coroutines.delay
 
 /** Four tabs under a floating tab bar. Tab content stays put while pushed screens come and go. */
 @Composable
@@ -71,12 +69,12 @@ fun MainScreen(shell: MainViewModel, state: MainUiState, wallet: Wallet) {
     val container = appContainer()
     val unread by container.chat.unreadTotal.collectAsStateWithLifecycle()
 
-    // Ask for notification permission once the user is in (Android 13+).
-    val notifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        if (it) container.push.register()
-    }
+    // On sign-in or opening the app: our own notifications card if they're off,
+    // after the welcome-coins sheet has had its turn. Never the system prompt
+    // straight away: a refusal there can be final.
     LaunchedEffect(Unit) {
-        if (Build.VERSION.SDK_INT >= 33) notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+        delay(3000)
+        if (container.coins.wallet.value.pendingBonus == null) shell.offerPushAsk(PushAskReason.Login, delayMs = 0)
     }
 
     Box(Modifier.fillMaxSize().background(RelunColors.Background)) {

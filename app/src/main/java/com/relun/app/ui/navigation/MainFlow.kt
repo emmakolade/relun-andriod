@@ -1,6 +1,13 @@
 package com.relun.app.ui.navigation
 
+import android.Manifest
+import android.app.Activity
+import android.content.Intent
+import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.LocalActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -10,12 +17,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.core.app.ActivityCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.relun.app.data.model.Person
+import com.relun.app.ui.common.appContainer
 import com.relun.app.ui.common.relunViewModel
 import com.relun.app.ui.components.ConfirmDialog
 import com.relun.app.ui.screens.chat.ChatScreen
@@ -23,15 +32,17 @@ import com.relun.app.ui.screens.main.MainScreen
 import com.relun.app.ui.screens.match.MatchOverlay
 import com.relun.app.ui.screens.me.EditProfileScreen
 import com.relun.app.ui.screens.me.ProfileViewsScreen
+import com.relun.app.ui.screens.notifications.NotificationsScreen
 import com.relun.app.ui.screens.profile.PersonProfileScreen
 import com.relun.app.ui.screens.settings.BlockedUsersScreen
 import com.relun.app.ui.screens.settings.SettingsScreen
 import com.relun.app.ui.screens.sheets.CoinsSheet
 import com.relun.app.ui.screens.sheets.InsightsSheet
+import com.relun.app.ui.screens.sheets.LikeLimitSheet
 import com.relun.app.ui.screens.sheets.MessageRequestSheet
 import com.relun.app.ui.screens.sheets.MoreSheet
-import com.relun.app.ui.screens.sheets.LikeLimitSheet
 import com.relun.app.ui.screens.sheets.PlusSheet
+import com.relun.app.ui.screens.sheets.PushAskSheet
 import com.relun.app.ui.screens.sheets.WelcomeCoinsSheet
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filterNotNull
@@ -44,6 +55,12 @@ class AppActions(
     val openInsights: () -> Unit,
     /** Relun Plus: plans, or the user's own status. */
     val openPlus: () -> Unit,
+    /** The list behind the bell. */
+    val openNotifications: () -> Unit,
+    /** A chat by id, e.g. from a notification; [openChat] needs the person. */
+    val openConversation: (userId: String, name: String) -> Unit,
+    /** Dates tab, "My Dates", where join requests are answered. */
+    val openMyDates: () -> Unit,
     /** Messages tab, "Likes You". */
     val openLikes: () -> Unit,
     val openMore: (Person) -> Unit,
@@ -66,6 +83,8 @@ fun MainFlow(pendingPush: MutableStateFlow<PushTarget?>) {
     val prices by vm.prices.collectAsStateWithLifecycle()
     val plusPrices by vm.plusPrices.collectAsStateWithLifecycle()
     val activity = LocalActivity.current
+    val container = appContainer()
+    val pushPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission(), vm::onPushPermission)
 
     val actions = remember(nav, vm) {
         AppActions(
@@ -74,6 +93,12 @@ fun MainFlow(pendingPush: MutableStateFlow<PushTarget?>) {
             openCoins = { vm.openCoins() },
             openInsights = vm::openInsights,
             openPlus = vm::openPlus,
+            openNotifications = { nav.navigate(NotificationsRoute) { launchSingleTop = true } },
+            openConversation = { userId, name -> nav.navigate(ChatRoute(userId, name)) { launchSingleTop = true } },
+            openMyDates = {
+                nav.popBackStack(MainRoute, inclusive = false)
+                vm.showDates()
+            },
             openLikes = vm::showLikes,
             openMore = vm::openMore,
             openSettings = { nav.navigate(SettingsRoute) { launchSingleTop = true } },
@@ -101,6 +126,11 @@ fun MainFlow(pendingPush: MutableStateFlow<PushTarget?>) {
                 "message", "message_request" -> target.userId?.let { nav.navigate(ChatRoute(it, "")) { launchSingleTop = true } }
                 "match" -> target.userId?.let { nav.navigate(PersonRoute(it)) { launchSingleTop = true } }
                     ?: vm.selectTab(Tab.Messages)
+                // Who liked them is under Likes You (or the offer to unlock it).
+                "like" -> {
+                    nav.popBackStack(MainRoute, inclusive = false)
+                    vm.showLikes()
+                }
                 "date_request" -> {
                     nav.popBackStack(MainRoute, inclusive = false)
                     vm.showDates()
@@ -130,6 +160,7 @@ fun MainFlow(pendingPush: MutableStateFlow<PushTarget?>) {
                 composable<BlockedRoute> { BlockedUsersScreen() }
                 composable<EditProfileRoute> { EditProfileScreen() }
                 composable<ProfileViewsRoute> { ProfileViewsScreen() }
+                composable<NotificationsRoute> { NotificationsScreen() }
             }
 
             state.match?.let { person ->
@@ -171,6 +202,25 @@ fun MainFlow(pendingPush: MutableStateFlow<PushTarget?>) {
                     onBuy = { basePlan -> activity?.let { vm.buyPlus(it, basePlan) } },
                     onDismiss = vm::closeSheet,
                 )
+                is MainSheet.PushAsk -> {
+                    val blocked = activity == null || !canShowPushPrompt(activity, container.pushAsk.systemPromptShown)
+                    PushAskSheet(
+                        reason = sheet.reason,
+                        blocked = blocked,
+                        onTurnOn = {
+                            container.pushAsk.systemPromptShown = true
+                            pushPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        },
+                        onOpenSettings = {
+                            vm.closeSheet()
+                            activity?.startActivity(
+                                Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                    .putExtra(Settings.EXTRA_APP_PACKAGE, activity.packageName)
+                            )
+                        },
+                        onDismiss = vm::closeSheet,
+                    )
+                }
                 MainSheet.LikeLimit -> LikeLimitSheet(wallet = wallet, onPlus = vm::openPlus, onDismiss = vm::closeSheet)
                 is MainSheet.Bonus -> WelcomeCoinsSheet(bonus = sheet.bonus, wallet = wallet, onDismiss = vm::closeSheet)
                 is MainSheet.More -> MoreSheet(
@@ -186,3 +236,12 @@ fun MainFlow(pendingPush: MutableStateFlow<PushTarget?>) {
         }
     }
 }
+
+/**
+ * Whether Android will still show its notification prompt. Before Android 13
+ * there is none (notifications are on unless turned off in settings); after a
+ * refusal it only shows again while the system says a rationale helps.
+ */
+private fun canShowPushPrompt(activity: Activity, promptShownBefore: Boolean): Boolean =
+    Build.VERSION.SDK_INT >= 33 &&
+        (!promptShownBefore || ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.POST_NOTIFICATIONS))
