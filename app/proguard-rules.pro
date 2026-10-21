@@ -18,3 +18,5 @@
 -dontwarn org.conscrypt.**
 -dontwarn org.bouncycastle.**
 -dontwarn org.openjsse.**
+
+# Sentry and PostHog ship their own consumer rules; nothing extra needed.

@@ -34,12 +34,25 @@ Without these, the app runs normally and simply doesn't register for push.
 
 A purchase is consumed only after the backend has verified and credited it. Purchases left unfinished after a crash are completed on the next launch.
 
+## Crash reporting and analytics (Sentry, PostHog)
+
+Both are off unless keys are set. Add to `local.properties` (or pass as `-P` Gradle properties):
+```
+relun.sentryDsn=https://<key>@<org>.ingest.sentry.io/<project>
+relun.posthogKey=phc_...
+relun.posthogHost=https://us.i.posthog.com   # optional; EU projects use https://eu.i.posthog.com
+```
+Sentry is started manually in `RelunApp` (its auto-init provider is disabled in the manifest), tagged `debug` or `production` by build type,
+with the version name as release. Session replay is off in both. Only the opaque user id is attached on sign-in and cleared on sign-out:
+no names, contact details or message text. Screens are reported by route name (`telemetry/Telemetry.kt`).
+
 ## Layout
 
 ```
 data/        DTOs, Retrofit API, token refresh, Socket.IO client, repositories
 billing/     Play Billing
 push/        FCM service + token registration
+telemetry/   Sentry + PostHog setup, Analytics.track, screen tracking
 location/    Fused location + geocoding
 di/          AppContainer (manual DI)
 ui/theme     Colours, Outfit/Pacifico type, segment accents (Relationship rose / Fun orange)

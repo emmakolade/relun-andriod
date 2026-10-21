@@ -9,6 +9,7 @@ import com.relun.app.data.model.Person
 import com.relun.app.data.repository.PeopleEvent
 import com.relun.app.di.AppContainer
 import com.relun.app.push.PushAskReason
+import com.relun.app.telemetry.Analytics
 import com.relun.app.ui.components.DialogSpec
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -220,7 +221,9 @@ class MainViewModel(private val c: AppContainer) : ViewModel() {
                     // The free allowance changed; the server has the count.
                     launch { c.coins.refresh() }
                     _state.update { it.copy(sendingRequest = false, sheet = null, requestDraft = "") }
+                    Analytics.track("message_sent", mapOf("kind" to "request"))
                     if (res.matched) {
+                        Analytics.track("match_created", mapOf("via" to "request"))
                         c.people.emit(PeopleEvent.Liked(person.id, isMatch = true))
                         c.people.emit(PeopleEvent.Matched(person.id))
                         c.messenger.success("It's a match! ${person.firstName} already liked you")

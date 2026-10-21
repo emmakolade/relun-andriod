@@ -20,6 +20,7 @@ import com.android.billingclient.api.consumePurchase
 import com.android.billingclient.api.queryProductDetails
 import com.android.billingclient.api.queryPurchasesAsync
 import com.relun.app.data.repository.CoinsRepository
+import com.relun.app.telemetry.Analytics
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -230,6 +231,9 @@ class BillingManager(
                         if (consumed.billingResult.responseCode != BillingClient.BillingResponseCode.OK) {
                             Log.w(TAG, "Consume failed: ${consumed.billingResult.debugMessage}")
                         }
+                        if (res.credited > 0 && !res.alreadyProcessed) {
+                            Analytics.track("coins_purchased", mapOf("coins" to res.credited, "store" to "play", "product_id" to productId))
+                        }
                         if (notify || res.credited > 0) {
                             _events.tryEmit(PurchaseEvent.Completed(res.credited, res.balance))
                         }
@@ -248,6 +252,7 @@ class BillingManager(
             coins.confirmPlayPlus(purchase.purchaseToken, pendingPlusPlan)
                 .onSuccess {
                     if (!purchase.isAcknowledged) {
+                        Analytics.track("plus_purchased", mapOf("store" to "play") + (pendingPlusPlan?.let { mapOf("plan" to it) } ?: emptyMap()))
                         val ack = client.acknowledgePurchase(
                             AcknowledgePurchaseParams.newBuilder().setPurchaseToken(purchase.purchaseToken).build()
                         )

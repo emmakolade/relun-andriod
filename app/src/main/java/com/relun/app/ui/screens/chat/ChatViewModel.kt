@@ -9,6 +9,7 @@ import com.relun.app.data.model.Person
 import com.relun.app.data.repository.PeopleEvent
 import com.relun.app.data.socket.SocketEvent
 import com.relun.app.di.AppContainer
+import com.relun.app.telemetry.Analytics
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -138,6 +139,7 @@ class ChatViewModel(private val c: AppContainer, private val userId: String, ini
             setStatus(clientId, MessageStatus.Failed)
             return
         }
+        Analytics.track("message_sent", mapOf("kind" to "chat"))
         // No echo within 10s means it didn't land.
         viewModelScope.launch {
             delay(10_000)

@@ -22,6 +22,13 @@ val localProps = Properties().apply {
 val debugApiBaseUrl = localProps.getProperty("relun.apiBaseUrl") ?: "http://10.0.2.2:9000/"
 val releaseApiBaseUrl = localProps.getProperty("relun.releaseApiBaseUrl") ?: "https://api.relun.chat/"
 
+// Crash reporting and analytics stay off unless these are set (local.properties or -P).
+fun relunProp(name: String, default: String = ""): String =
+    localProps.getProperty(name) ?: (findProperty(name) as String?) ?: default
+val sentryDsn = relunProp("relun.sentryDsn")
+val posthogKey = relunProp("relun.posthogKey")
+val posthogHost = relunProp("relun.posthogHost", "https://us.i.posthog.com")
+
 android {
     namespace = "com.relun.app"
     compileSdk = 36
@@ -32,6 +39,9 @@ android {
         targetSdk = 36
         versionCode = 57
         versionName = "2.0.0"
+        buildConfigField("String", "SENTRY_DSN", "\"$sentryDsn\"")
+        buildConfigField("String", "POSTHOG_KEY", "\"$posthogKey\"")
+        buildConfigField("String", "POSTHOG_HOST", "\"$posthogHost\"")
     }
 
     buildTypes {
@@ -108,6 +118,8 @@ dependencies {
     implementation(libs.billing.ktx)
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.messaging)
+    implementation(libs.sentry.android)
+    implementation(libs.posthog.android)
 
     testImplementation(libs.junit)
 }

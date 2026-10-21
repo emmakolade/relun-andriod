@@ -24,6 +24,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.relun.app.data.model.Person
+import com.relun.app.telemetry.TrackScreens
 import com.relun.app.ui.common.appContainer
 import com.relun.app.ui.common.relunViewModel
 import com.relun.app.ui.components.ConfirmDialog
@@ -77,6 +78,7 @@ val LocalAppActions = staticCompositionLocalOf<AppActions> { error("AppActions n
 @Composable
 fun MainFlow(pendingPush: MutableStateFlow<PushTarget?>) {
     val nav = rememberNavController()
+    TrackScreens(nav)
     val vm = relunViewModel { MainViewModel(it) }
     val state by vm.state.collectAsStateWithLifecycle()
     val wallet by vm.wallet.collectAsStateWithLifecycle()

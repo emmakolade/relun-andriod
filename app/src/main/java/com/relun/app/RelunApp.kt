@@ -8,6 +8,7 @@ import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.crossfade
 import com.relun.app.di.AppContainer
 import com.relun.app.push.createNotificationChannels
+import com.relun.app.telemetry.Telemetry
 
 class RelunApp : Application(), SingletonImageLoader.Factory {
 
@@ -16,8 +17,10 @@ class RelunApp : Application(), SingletonImageLoader.Factory {
 
     override fun onCreate() {
         super.onCreate()
+        Telemetry.init(this)
         createNotificationChannels(this)
         container = AppContainer(this)
+        container.session.current.userId?.let(Telemetry::identify)
     }
 
     override fun newImageLoader(context: PlatformContext): ImageLoader =

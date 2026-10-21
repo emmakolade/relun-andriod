@@ -81,6 +81,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.relun.app.data.model.Segment
 import com.relun.app.data.repository.OnboardingStart
+import com.relun.app.telemetry.TrackScreens
 import com.relun.app.ui.common.appContainer
 import com.relun.app.ui.common.relunViewModel
 import com.relun.app.ui.components.BackButton
@@ -109,6 +110,7 @@ import com.relun.app.ui.theme.SegmentColors
 @Composable
 fun OnboardingFlow(start: OnboardingStart) {
     val nav = rememberNavController()
+    TrackScreens(nav)
     val vm = relunViewModel(key = "onboarding") { OnboardingViewModel(it) }
     val state by vm.state.collectAsStateWithLifecycle()
     val startRoute: Any = if (start == OnboardingStart.Photos) PhotosRoute else SegmentRoute

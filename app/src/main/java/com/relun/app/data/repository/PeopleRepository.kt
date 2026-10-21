@@ -5,6 +5,7 @@ import com.relun.app.data.model.toPerson
 import com.relun.app.data.network.ApiException
 import com.relun.app.data.network.ApiService
 import com.relun.app.data.network.apiCall
+import com.relun.app.telemetry.Analytics
 import java.time.Instant
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -59,7 +60,9 @@ class PeopleRepository(private val api: ApiService) {
     suspend fun like(person: Person): Result<Boolean> = apiCall { api.like(person.id) }.onFailure { e ->
         if (e.isLikeLimit) _likeLimitReached.tryEmit(Unit)
     }.map { res ->
+        if (!res.alreadyLiked) Analytics.track("like_sent")
         if (res.isMutual && !res.alreadyLiked) {
+            Analytics.track("match_created", mapOf("via" to "like"))
             _newMatches.tryEmit(person.copy(isMatch = true, liked = true))
         }
         _events.tryEmit(PeopleEvent.Liked(person.id, res.isMutual))

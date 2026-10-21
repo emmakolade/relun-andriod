@@ -6,6 +6,8 @@ import com.relun.app.data.model.VerifyOtpBody
 import com.relun.app.data.network.ApiService
 import com.relun.app.data.network.apiCall
 import com.relun.app.data.session.SessionStore
+import com.relun.app.telemetry.Analytics
+import com.relun.app.telemetry.Telemetry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -85,6 +87,9 @@ class AuthRepository(
             api.verifyOtp(VerifyOtpBody(email = body.email, phone = body.phone, otp = code))
         }.map { response ->
             session.saveSignIn(response.accessToken, response.refreshToken, response.user.id, method.wire)
+            Telemetry.identify(response.user.id)
+            // No profile yet is the closest client-side signal for a new account.
+            Analytics.track(if (response.needsProfileCompletion) "signed_up" else "signed_in", mapOf("method" to method.wire))
             _segment.value = Segment.from(response.user.profile?.segment)
             VerifyOutcome(
                 needsProfile = response.needsProfileCompletion,
@@ -111,6 +116,7 @@ class AuthRepository(
     suspend fun signOutLocally() {
         onSignedOut()
         session.clear()
+        Telemetry.reset()
         _segment.value = Segment.Relationship
         _state.value = AuthState.SignedOut
     }

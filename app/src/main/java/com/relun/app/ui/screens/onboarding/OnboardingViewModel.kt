@@ -10,6 +10,7 @@ import com.relun.app.data.model.Segment
 import com.relun.app.data.repository.AuthRepository
 import com.relun.app.di.AppContainer
 import com.relun.app.location.Coordinates
+import com.relun.app.telemetry.Analytics
 import com.relun.app.util.calculateAge
 import com.relun.app.util.compressForUpload
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -239,5 +240,8 @@ class OnboardingViewModel(private val c: AppContainer) : ViewModel() {
         }
     }
 
-    fun finish() = c.auth.finishOnboarding()
+    fun finish() {
+        Analytics.track("profile_completed")
+        c.auth.finishOnboarding()
+    }
 }

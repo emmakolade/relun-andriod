@@ -50,5 +50,8 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_color"
             android:resource="@color/relun_rose" />
+
+        <!-- Sentry is started by RelunApp (only when a DSN is configured). -->
+        <meta-data android:name="io.sentry.auto-init" android:value="false" />
     </application>
 </manifest>

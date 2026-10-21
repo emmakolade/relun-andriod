@@ -27,6 +27,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.relun.app.data.repository.AuthState
 import com.relun.app.data.repository.OnboardingStart
+import com.relun.app.telemetry.TrackScreens
 import com.relun.app.ui.common.Toast
 import com.relun.app.ui.common.appContainer
 import com.relun.app.ui.components.RingsMark
@@ -87,6 +88,7 @@ fun RelunRoot(pendingPush: MutableStateFlow<PushTarget?>) {
 @Composable
 private fun SignedOutFlow() {
     val nav = rememberNavController()
+    TrackScreens(nav)
     NavHost(
         navController = nav,
         startDestination = WelcomeRoute,
