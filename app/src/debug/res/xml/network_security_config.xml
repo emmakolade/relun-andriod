@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug builds only: may reach a local backend over HTTP (the emulator's host at
+     10.0.2.2, or a LAN address set in local.properties). Release builds use
+     src/main/res/xml/network_security_config.xml, which is HTTPS only. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

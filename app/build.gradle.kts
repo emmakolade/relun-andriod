@@ -18,9 +18,9 @@ val localProps = Properties().apply {
 }
 
 // The emulator reaches the host machine at 10.0.2.2. Override in local.properties:
-//   relun.apiBaseUrl=https://api.relun.app/
+//   relun.apiBaseUrl=https://api.relun.chat/
 val debugApiBaseUrl = localProps.getProperty("relun.apiBaseUrl") ?: "http://10.0.2.2:9000/"
-val releaseApiBaseUrl = localProps.getProperty("relun.releaseApiBaseUrl") ?: "https://api.relun.app/"
+val releaseApiBaseUrl = localProps.getProperty("relun.releaseApiBaseUrl") ?: "https://api.relun.chat/"
 
 android {
     namespace = "com.relun.app"

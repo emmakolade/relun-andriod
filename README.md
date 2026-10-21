@@ -11,7 +11,7 @@ It talks to `relun-backend` (REST + Socket.IO).
    For a physical phone, set your PC's LAN address in `local.properties`:
    ```
    relun.apiBaseUrl=http://192.168.1.10:9000/
-   relun.releaseApiBaseUrl=https://api.relun.app/
+   relun.releaseApiBaseUrl=https://api.relun.chat/
    ```
    Cleartext HTTP is only allowed in debug builds.
 
