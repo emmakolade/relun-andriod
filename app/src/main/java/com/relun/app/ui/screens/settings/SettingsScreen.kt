@@ -51,6 +51,8 @@ import com.relun.app.ui.components.SectionHeader
 import com.relun.app.ui.components.SegmentPill
 import com.relun.app.ui.components.ToggleRow
 import com.relun.app.ui.navigation.LocalAppActions
+import com.relun.app.ui.screens.onboarding.Gender
+import com.relun.app.ui.screens.onboarding.ShowMe
 import com.relun.app.ui.screens.onboarding.openAppSettings
 import com.relun.app.ui.theme.Relun
 import com.relun.app.ui.theme.RelunColors
@@ -89,6 +91,16 @@ fun SettingsScreen() {
                 val top = if (settings.ageMax >= 99) "70+" else settings.ageMax.toString()
                 ListRow("Age range", { c.messenger.info("Change this from the filters button on Discover") }, value = "${settings.ageMin}–$top")
                 ListRow("Maximum distance", { c.messenger.info("Change this from the filters button on Discover") }, value = "${settings.maxDistanceKm} km")
+                Gender.fromWire(settings.gender)?.let { gender ->
+                    val everyone = settings.showMe == ShowMe.Everyone.wire
+                    val next = if (everyone) ShowMe.Opposite.wire else ShowMe.Everyone.wire
+                    ToggleRow(
+                        "Show everyone",
+                        everyone,
+                        subtitle = if (everyone) "You see both men and women" else "You only see ${gender.opposite.plural.lowercase()}",
+                        onToggle = { patch(SettingsPatch(showMe = next), settings.copy(showMe = next)) },
+                    )
+                }
                 ListRow("Looking for", null, divider = false, showChevron = false) {
                     Icon(Icons.Rounded.Lock, null, tint = RelunColors.Muted, modifier = Modifier.size(14.dp))
                     SegmentPill(text = Relun.segment.label, small = true)

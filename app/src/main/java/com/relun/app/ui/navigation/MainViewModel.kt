@@ -11,6 +11,7 @@ import com.relun.app.di.AppContainer
 import com.relun.app.push.PushAskReason
 import com.relun.app.telemetry.Analytics
 import com.relun.app.ui.components.DialogSpec
+import com.relun.app.ui.screens.sheets.CoinsContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -61,6 +62,8 @@ data class MainUiState(
     val showMyDates: Int = 0,
     /** Bumped to ask the Messages tab to show "Likes You". */
     val showLikes: Int = 0,
+    /** The prompt that opened the Plus sheet, e.g. "coins_sheet"; tags plus_purchased. */
+    val plusSource: String? = null,
 )
 
 /**
@@ -134,9 +137,15 @@ class MainViewModel(private val c: AppContainer) : ViewModel() {
     }
 
     fun openInsights() = _state.update { it.copy(sheet = MainSheet.Insights) }
-    fun openPlus() {
-        _state.update { it.copy(sheet = MainSheet.Plus) }
+    fun openPlus(source: String? = null) {
+        _state.update { it.copy(sheet = MainSheet.Plus, plusSource = source) }
         viewModelScope.launch { c.coins.refresh() }
+    }
+
+    /** The Plus card on the coins sheet, tagged with why the coins sheet opened. */
+    fun openPlusFromCoins(context: CoinsContext) {
+        Analytics.track("plus_upsell_tapped", mapOf("source" to "coins_sheet", "context" to context.wire))
+        openPlus(source = "coins_sheet")
     }
     fun openMore(person: Person) = _state.update { it.copy(sheet = MainSheet.More(person)) }
     fun closeSheet() {
@@ -282,7 +291,7 @@ class MainViewModel(private val c: AppContainer) : ViewModel() {
     /** Starts Relun Plus through Google Play on [basePlanId] ("weekly" or "monthly"). */
     fun buyPlus(activity: Activity, basePlanId: String) {
         _state.update { it.copy(buying = true) }
-        c.billing.launchPlus(activity, basePlanId)
+        c.billing.launchPlus(activity, basePlanId, _state.value.plusSource)
     }
 
     fun buy(activity: Activity) {

@@ -67,14 +67,20 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+/** Why the coins sheet opened, so the Plus card can lead with what they were after. */
+enum class CoinsContext(val wire: String) { Views("insights"), Request("request"), General("general") }
+
 @Composable
 fun CoinsSheet(
     wallet: Wallet,
     prices: Map<String, String>,
+    plusPrices: Map<String, String>,
+    context: CoinsContext,
     selected: Int,
     buying: Boolean,
     onSelect: (Int) -> Unit,
     onBuy: () -> Unit,
+    onPlus: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val seg = Relun.segment
@@ -139,7 +145,24 @@ fun CoinsSheet(
         }
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Perk(Icons.Outlined.MarkChatUnread, "Message someone without matching · ${wallet.messageRequestCost} coins")
-            Perk(Icons.Outlined.Visibility, "See Likes & Views · ${wallet.insights7Cost} coins / 7 days")
+            Perk(
+                Icons.Outlined.Visibility,
+                "See Likes & Views · ${wallet.insights7Cost} coins / 7 days" + if (wallet.plus == null) " or included in Plus" else "",
+            )
+        }
+        // Plus covers what most people top up for; offer it, but keep Buy the main action.
+        val weekly = wallet.plans.firstOrNull { it.id == "weekly" } ?: wallet.plans.firstOrNull()
+        if (wallet.plus == null && weekly != null) {
+            val price = plusPrices[weekly.playBasePlanId]?.takeIf(String::isNotBlank) ?: moneyOf(weekly.amount, weekly.currency)
+            PlusUpsellCard(
+                subtitle = when (context) {
+                    CoinsContext.Views -> "Likes & Views included · unlimited likes"
+                    CoinsContext.Request -> "${wallet.plusPerks.monthlyRequests} free message requests a month · unlimited likes"
+                    CoinsContext.General -> "Unlimited likes · Likes & Views included"
+                },
+                price = "from $price/${if (weekly.id == "weekly") "wk" else "mo"}",
+                onClick = onPlus,
+            )
         }
         val pkg = wallet.packages.getOrNull(selected)
         PrimaryButton(
@@ -156,6 +179,34 @@ fun CoinsSheet(
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth(),
         )
+    }
+}
+
+@Composable
+private fun PlusUpsellCard(subtitle: String, price: String, onClick: () -> Unit) {
+    val seg = Relun.segment
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(seg.tint)
+            .border(1.dp, seg.fill.copy(alpha = 0.35f), RoundedCornerShape(18.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(Modifier.size(36.dp).clip(RoundedCornerShape(12.dp)).background(seg.fill), contentAlignment = Alignment.Center) {
+            Icon(Icons.Rounded.WorkspacePremium, null, tint = seg.onFill, modifier = Modifier.size(20.dp))
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Or get Relun Plus", style = MaterialTheme.typography.titleSmall, color = seg.text, modifier = Modifier.weight(1f))
+                Text(price, style = MaterialTheme.typography.labelMedium, color = seg.text)
+            }
+            Text(subtitle, style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp), color = RelunColors.Body)
+        }
+        Icon(Icons.Rounded.ChevronRight, null, tint = seg.text, modifier = Modifier.size(20.dp))
     }
 }
 

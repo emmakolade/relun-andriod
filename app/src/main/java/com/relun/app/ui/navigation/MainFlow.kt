@@ -37,6 +37,7 @@ import com.relun.app.ui.screens.notifications.NotificationsScreen
 import com.relun.app.ui.screens.profile.PersonProfileScreen
 import com.relun.app.ui.screens.settings.BlockedUsersScreen
 import com.relun.app.ui.screens.settings.SettingsScreen
+import com.relun.app.ui.screens.sheets.CoinsContext
 import com.relun.app.ui.screens.sheets.CoinsSheet
 import com.relun.app.ui.screens.sheets.InsightsSheet
 import com.relun.app.ui.screens.sheets.LikeLimitSheet
@@ -170,15 +171,25 @@ fun MainFlow(pendingPush: MutableStateFlow<PushTarget?>) {
             }
 
             when (val sheet = state.sheet) {
-                is MainSheet.Coins -> CoinsSheet(
-                    wallet = wallet,
-                    prices = prices,
-                    selected = state.selectedPackage,
-                    buying = state.buying,
-                    onSelect = vm::selectPackage,
-                    onBuy = { activity?.let(vm::buy) },
-                    onDismiss = vm::closeSheet,
-                )
+                is MainSheet.Coins -> {
+                    val context = when (sheet.then) {
+                        MainSheet.Insights -> CoinsContext.Views
+                        is MainSheet.Request -> CoinsContext.Request
+                        else -> CoinsContext.General
+                    }
+                    CoinsSheet(
+                        wallet = wallet,
+                        prices = prices,
+                        plusPrices = plusPrices,
+                        context = context,
+                        selected = state.selectedPackage,
+                        buying = state.buying,
+                        onSelect = vm::selectPackage,
+                        onBuy = { activity?.let(vm::buy) },
+                        onPlus = { vm.openPlusFromCoins(context) },
+                        onDismiss = vm::closeSheet,
+                    )
+                }
                 is MainSheet.Request -> MessageRequestSheet(
                     person = sheet.person,
                     wallet = wallet,

@@ -121,8 +121,8 @@ data class Wallet(
     /** Likes & Views, from a coin pass or from Plus. */
     val insightsActive: Boolean = false,
     val messageRequestCost: Int = 200,
-    val insights7Cost: Int = 700,
-    val insights30Cost: Int = 1500,
+    val insights7Cost: Int = 500,
+    val insights30Cost: Int = 1000,
     /** A date post beyond the free active ones. */
     val datePostCost: Int = 100,
     val packages: List<CoinPackageDto> = emptyList(),

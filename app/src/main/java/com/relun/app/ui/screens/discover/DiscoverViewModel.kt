@@ -37,8 +37,12 @@ class DiscoverViewModel(private val c: AppContainer) : ViewModel() {
     init {
         load()
         viewModelScope.launch {
+            var showMe: String? = null
             c.settings.settings.collect { s ->
                 _state.update { it.copy(maxDistanceKm = s.maxDistanceKm, ageMin = s.ageMin, ageMax = s.ageMax) }
+                // "Show me" changes in Settings, so reload the feed when it does.
+                if (showMe != null && showMe != s.showMe) load()
+                showMe = s.showMe
             }
         }
         viewModelScope.launch {

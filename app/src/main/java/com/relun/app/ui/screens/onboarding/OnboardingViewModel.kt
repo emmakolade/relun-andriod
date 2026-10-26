@@ -12,6 +12,7 @@ import com.relun.app.di.AppContainer
 import com.relun.app.location.Coordinates
 import com.relun.app.telemetry.Analytics
 import com.relun.app.util.calculateAge
+import com.relun.app.util.PhotoReadException
 import com.relun.app.util.compressForUpload
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,7 +21,19 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
-enum class Gender(val label: String, val wire: String) { Female("Female", "female"), Male("Male", "male") }
+enum class Gender(val label: String, val wire: String, val plural: String) {
+    Female("Female", "female", "Women"),
+    Male("Male", "male", "Men");
+
+    val opposite: Gender get() = if (this == Female) Male else Female
+
+    companion object {
+        fun fromWire(wire: String?): Gender? = entries.firstOrNull { it.wire == wire }
+    }
+}
+
+/** Who Discover shows. [Opposite] is the default and is picked for the user from their gender. */
+enum class ShowMe(val wire: String) { Opposite("opposite"), Everyone("everyone") }
 
 enum class LocationStatus { Idle, Loading, Granted, Denied }
 
@@ -37,6 +50,7 @@ data class OnboardingState(
     val month: String = "",
     val year: String = "",
     val gender: Gender? = null,
+    val showMe: ShowMe = ShowMe.Opposite,
     val recovery: String = "",
     val bio: String = "",
     val nameTouched: Boolean = false,
@@ -121,7 +135,9 @@ class OnboardingViewModel(private val c: AppContainer) : ViewModel() {
     fun setDay(v: String) = _state.update { it.copy(day = v.filter(Char::isDigit).take(2)) }
     fun setMonth(v: String) = _state.update { it.copy(month = v.filter(Char::isDigit).take(2)) }
     fun setYear(v: String) = _state.update { it.copy(year = v.filter(Char::isDigit).take(4)) }
-    fun setGender(g: Gender) = _state.update { it.copy(gender = g) }
+    // Picking a gender pre-selects the other one under "Show me".
+    fun setGender(g: Gender) = _state.update { it.copy(gender = g, showMe = ShowMe.Opposite) }
+    fun setShowMe(v: ShowMe) = _state.update { it.copy(showMe = v) }
     fun setRecovery(v: String) = _state.update { it.copy(recovery = v.take(80)) }
     fun setBio(v: String) = _state.update { it.copy(bio = v.take(150)) }
 
@@ -140,6 +156,7 @@ class OnboardingViewModel(private val c: AppContainer) : ViewModel() {
                     dateOfBirth = s.dateOfBirth.toString(),
                     gender = s.gender!!.wire,
                     segment = s.segment.wire,
+                    showMe = s.showMe.wire,
                     bio = s.bio.trim().ifBlank { null },
                     email = if (s.signedInByPhone) recovery?.lowercase() else null,
                     phone = if (!s.signedInByPhone) recovery?.filter { it.isDigit() || it == '+' } else null,
@@ -201,12 +218,12 @@ class OnboardingViewModel(private val c: AppContainer) : ViewModel() {
         if (_state.value.slots.getOrNull(index) != PhotoSlot.Empty) return
         setSlot(index, PhotoSlot.Uploading(uri))
         viewModelScope.launch {
-            val bytes = runCatching { compressForUpload(context, uri) }.getOrElse {
+            val image = runCatching { compressForUpload(context, uri) }.getOrElse {
                 setSlot(index, PhotoSlot.Empty)
-                c.messenger.error("We couldn’t read that photo. Try another one.")
+                c.messenger.error((it as? PhotoReadException)?.message ?: "We couldn’t read that photo. Try another one.")
                 return@launch
             }
-            c.profile.uploadPhoto(bytes)
+            c.profile.uploadPhoto(image)
                 .onSuccess { setSlot(index, PhotoSlot.Done(it)) }
                 .onFailure {
                     setSlot(index, PhotoSlot.Empty)

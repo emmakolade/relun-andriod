@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -282,20 +283,15 @@ private fun ColumnScope.DetailsStep(state: OnboardingState, vm: OnboardingViewMo
     LabeledField("Gender") {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Gender.entries.forEach { g ->
-                val on = state.gender == g
-                val s = Relun.segment
-                Box(
-                    Modifier
-                        .weight(1f)
-                        .height(50.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(if (on) s.tint else Color.White)
-                        .border(1.5.dp, if (on) s.fill else RelunColors.Border, RoundedCornerShape(16.dp))
-                        .clickable(role = Role.RadioButton) { vm.setGender(g) },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(g.label, style = MaterialTheme.typography.labelLarge.copy(fontSize = 16.sp), color = if (on) s.text else RelunColors.Ink)
-                }
+                ChoicePill(g.label, state.gender == g) { vm.setGender(g) }
+            }
+        }
+    }
+    state.gender?.let { gender ->
+        LabeledField("Show me") {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ChoicePill(gender.opposite.plural, state.showMe == ShowMe.Opposite) { vm.setShowMe(ShowMe.Opposite) }
+                ChoicePill("Everyone", state.showMe == ShowMe.Everyone) { vm.setShowMe(ShowMe.Everyone) }
             }
         }
     }
@@ -322,6 +318,23 @@ private fun ColumnScope.DetailsStep(state: OnboardingState, vm: OnboardingViewMo
     }
     Spacer(Modifier.height(4.dp))
     PrimaryButton("Continue", { vm.submitDetails(onNext) }, enabled = state.detailsValid, loading = state.submitting)
+}
+
+@Composable
+private fun RowScope.ChoicePill(label: String, on: Boolean, onClick: () -> Unit) {
+    val s = Relun.segment
+    Box(
+        Modifier
+            .weight(1f)
+            .height(50.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (on) s.tint else Color.White)
+            .border(1.5.dp, if (on) s.fill else RelunColors.Border, RoundedCornerShape(16.dp))
+            .clickable(role = Role.RadioButton, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, style = MaterialTheme.typography.labelLarge.copy(fontSize = 16.sp), color = if (on) s.text else RelunColors.Ink)
+    }
 }
 
 /** Runs [block] when the field loses focus after having had it (blur validation). */

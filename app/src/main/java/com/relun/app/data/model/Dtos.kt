@@ -153,6 +153,7 @@ data class CompleteProfileBody(
     val dateOfBirth: String,
     val gender: String,
     val segment: String,
+    val showMe: String? = null,
     val bio: String? = null,
     val email: String? = null,
     val phone: String? = null,
@@ -235,8 +236,8 @@ data class CoinPackageDto(
 @Serializable
 data class CoinCostsDto(
     val messageRequest: Int = 200,
-    val insights7: Int = 700,
-    val insights30: Int = 1500,
+    val insights7: Int = 500,
+    val insights30: Int = 1000,
     /** A date post beyond the free active ones. */
     val datePost: Int = 100,
 )
@@ -392,6 +393,10 @@ data class SettingsDto(
     val ageMin: Int = 18,
     val ageMax: Int = 99,
     val segment: String = "relationship",
+    /** "opposite" or "everyone". */
+    val showMe: String = "opposite",
+    /** The user's own gender, read-only here; labels "Show me" as Men or Women. */
+    val gender: String? = null,
 )
 
 @Serializable
@@ -407,6 +412,7 @@ data class SettingsPatch(
     val maxDistanceKm: Int? = null,
     val ageMin: Int? = null,
     val ageMax: Int? = null,
+    val showMe: String? = null,
 )
 
 @Serializable

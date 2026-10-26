@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import okhttp3.MediaType.Companion.toMediaType
+import com.relun.app.util.UploadImage
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.time.LocalDate
@@ -66,14 +67,14 @@ class ProfileRepository(private val api: ApiService) {
     suspend fun updateDetails(body: UpdateProfileBody) = apiCall { api.updateProfile(body) }
         .onSuccess { refresh() }
 
-    suspend fun uploadPhoto(jpeg: ByteArray): Result<Photo> = apiCall {
-        api.uploadPhoto(jpeg.toPart("photos"))
+    suspend fun uploadPhoto(image: UploadImage): Result<Photo> = apiCall {
+        api.uploadPhoto(image.toPart("photos"))
     }.map { Photo(it.id, it.url) }.onSuccess { photo ->
         _me.value = _me.value?.let { it.copy(photos = it.photos + photo) }
     }
 
-    suspend fun replacePhoto(photoId: String, jpeg: ByteArray): Result<Photo> = apiCall {
-        api.replacePhoto(photoId, jpeg.toPart("photo"))
+    suspend fun replacePhoto(photoId: String, image: UploadImage): Result<Photo> = apiCall {
+        api.replacePhoto(photoId, image.toPart("photo"))
     }.map { Photo(it.id, it.url) }.onSuccess { photo ->
         _me.value = _me.value?.let { me -> me.copy(photos = me.photos.map { if (it.id == photoId) photo else it }) }
     }
@@ -86,10 +87,10 @@ class ProfileRepository(private val api: ApiService) {
         _me.value = null
     }
 
-    private fun ByteArray.toPart(field: String) = MultipartBody.Part.createFormData(
+    private fun UploadImage.toPart(field: String) = MultipartBody.Part.createFormData(
         field,
-        "photo.jpg",
-        toRequestBody("image/jpeg".toMediaType()),
+        fileName,
+        bytes.toRequestBody(mimeType.toMediaType()),
     )
 
     private fun MyProfileResponse.toMyProfile() = MyProfile(

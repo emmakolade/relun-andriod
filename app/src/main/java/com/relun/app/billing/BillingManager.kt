@@ -75,6 +75,7 @@ class BillingManager(
 
     /** The base plan of the subscription being bought, for the server when Play can't be asked. */
     private var pendingPlusPlan: String? = null
+    private var pendingPlusSource: String? = null
 
     private var ready: CompletableDeferred<Boolean>? = null
 
@@ -133,8 +134,11 @@ class BillingManager(
             .associate { it.basePlanId to it.pricingPhases.pricingPhaseList.lastOrNull()?.formattedPrice.orEmpty() }
     }
 
-    /** Starts the Relun Plus subscription on [basePlanId] ("weekly" or "monthly"). */
-    fun launchPlus(activity: Activity, basePlanId: String) {
+    /**
+     * Starts the Relun Plus subscription on [basePlanId] ("weekly" or "monthly").
+     * [source] says which prompt led here, e.g. "coins_sheet", for plus_purchased.
+     */
+    fun launchPlus(activity: Activity, basePlanId: String, source: String? = null) {
         scope.launch {
             if (!ensureConnected()) {
                 _events.tryEmit(PurchaseEvent.Failed("Google Play isn’t available right now."))
@@ -151,6 +155,7 @@ class BillingManager(
                 return@launch
             }
             pendingPlusPlan = basePlanId
+            pendingPlusSource = source
             val params = BillingFlowParams.newBuilder()
                 .setProductDetailsParamsList(
                     listOf(
@@ -252,7 +257,12 @@ class BillingManager(
             coins.confirmPlayPlus(purchase.purchaseToken, pendingPlusPlan)
                 .onSuccess {
                     if (!purchase.isAcknowledged) {
-                        Analytics.track("plus_purchased", mapOf("store" to "play") + (pendingPlusPlan?.let { mapOf("plan" to it) } ?: emptyMap()))
+                        Analytics.track(
+                            "plus_purchased",
+                            mapOf("store" to "play") +
+                                (pendingPlusPlan?.let { mapOf("plan" to it) } ?: emptyMap()) +
+                                (pendingPlusSource?.let { mapOf("source" to it) } ?: emptyMap()),
+                        )
                         val ack = client.acknowledgePurchase(
                             AcknowledgePurchaseParams.newBuilder().setPurchaseToken(purchase.purchaseToken).build()
                         )
@@ -261,6 +271,7 @@ class BillingManager(
                         }
                     }
                     pendingPlusPlan = null
+                    pendingPlusSource = null
                     if (notify) _events.tryEmit(PurchaseEvent.PlusActive)
                 }
                 .onFailure { error ->

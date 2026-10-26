@@ -1,4 +1,4 @@
-﻿package com.relun.app.ui.screens.me
+package com.relun.app.ui.screens.me
 
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.WorkspacePremium
@@ -91,6 +91,7 @@ import com.relun.app.ui.screens.onboarding.PhotoSlot
 import com.relun.app.ui.screens.onboarding.PhotoSlotView
 import com.relun.app.ui.theme.Relun
 import com.relun.app.ui.theme.RelunColors
+import com.relun.app.util.PhotoReadException
 import com.relun.app.util.compressForUpload
 import com.relun.app.util.formatCoins
 import kotlinx.coroutines.async
@@ -138,11 +139,12 @@ class MeViewModel(private val c: AppContainer) : ViewModel() {
     private fun upload(context: Context, slot: Int, uri: Uri, replace: Photo?) {
         _state.update { it.copy(uploading = it.uploading + slot) }
         viewModelScope.launch {
-            val bytes = runCatching { compressForUpload(context, uri) }.getOrNull()
-            if (bytes == null) {
-                c.messenger.error("We couldn’t read that photo. Try another one.")
+            val read = runCatching { compressForUpload(context, uri) }
+            val image = read.getOrNull()
+            if (image == null) {
+                c.messenger.error((read.exceptionOrNull() as? PhotoReadException)?.message ?: "We couldn’t read that photo. Try another one.")
             } else {
-                val result = if (replace != null) c.profile.replacePhoto(replace.id, bytes) else c.profile.uploadPhoto(bytes)
+                val result = if (replace != null) c.profile.replacePhoto(replace.id, image) else c.profile.uploadPhoto(image)
                 result.onSuccess { c.messenger.success("Photo saved") }.onFailure { c.messenger.error(it.message ?: "Upload failed.") }
             }
             _state.update { it.copy(uploading = it.uploading - slot) }
