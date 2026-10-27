@@ -128,6 +128,9 @@ fun SettingsScreen() {
                 ToggleRow("Push notifications", settings.notificationsEnabled, onToggle = {
                     patch(SettingsPatch(notificationsEnabled = !settings.notificationsEnabled), settings.copy(notificationsEnabled = !settings.notificationsEnabled))
                 })
+                ToggleRow("Email notifications", settings.emailNotificationsEnabled, subtitle = "Likes, first messages, matches and date updates", onToggle = {
+                    patch(SettingsPatch(emailNotificationsEnabled = !settings.emailNotificationsEnabled), settings.copy(emailNotificationsEnabled = !settings.emailNotificationsEnabled))
+                })
                 ListRow("Location services", { openAppSettings(context) }, value = if (c.location.hasPermission()) "On" else "Off", divider = false)
             }
             Section("Account") {
